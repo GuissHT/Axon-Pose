@@ -1,0 +1,304 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Mi Progreso{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px;">
+    <h1 class="fw-bold mb-2">
+        {% if is_viewing_other %}
+            <i class="fas fa-user-injured me-2"></i> Progreso de: {{ target_user.get_full_name|default:target_user.username }}
+        {% else %}
+            <i class="fas fa-chart-line me-2"></i> Mi progreso histórico
+        {% endif %}
+    </h1>
+    <p class="mb-4 opacity-90">Análisis acumulado de sesiones registradas y seguimiento de la evolución clínica.</p>
+    
+    <div class="d-flex gap-2">
+        <a href="{% url 'descargar_reporte_pdf' %}{% if is_viewing_other %}?patient_id={{ target_user.id }}{% endif %}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fas fa-file-pdf text-danger me-2"></i> Descargar PDF Clínico
+        </a>
+        {% if is_viewing_other %}
+            <a href="{% url 'progreso_pacientes' %}" class="btn btn-outline-light rounded-pill px-4 fw-bold">
+                <i class="fas fa-arrow-left me-2"></i> Volver a listado
+            </a>
+        {% else %}
+            <a href="{% url 'mi_doctor' %}" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm">
+                <i class="fas fa-paper-plane me-2"></i> Enviar al Doctor
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-calendar-check fa-2x text-primary"></i>
+                </div>
+                <div>
+                    <small class="text-uppercase text-secondary fw-bold">Sesiones Totales</small>
+                    <h3 class="fw-bold mb-0 text-dark">{{ history_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-info bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-balance-scale fa-2x text-info"></i>
+                </div>
+                <div>
+                    <small class="text-uppercase text-secondary fw-bold">Estabilidad Prom.</small>
+                    <h3 class="fw-bold mb-0 text-dark">{{ avg_stability }}%</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-trophy fa-2x text-success"></i>
+                </div>
+                <div>
+                    <small class="text-uppercase text-secondary fw-bold">Mejor Estabilidad</small>
+                    <h3 class="fw-bold mb-0 text-dark">{{ best_stability }}%</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-warning bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-arrows-alt-h fa-2x text-warning"></i>
+                </div>
+                <div>
+                    <small class="text-uppercase text-secondary fw-bold">Desviación Prom.</small>
+                    <h3 class="fw-bold mb-0 text-dark">{{ avg_deviation }} cm</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.95);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4"><i class="fas fa-chart-area me-2 text-primary"></i> Tendencia de Progreso</h5>
+                <div style="height: 300px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.95);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4"><i class="fas fa-dumbbell me-2 text-info"></i> Sesiones por Ejercicio</h5>
+                <div style="height: 300px;">
+                    <canvas id="exerciseChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sección de Encuesta de Salud -->
+<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-4"><i class="fas fa-clipboard-check me-2 text-info"></i> Resultados de la Encuesta de Salud</h5>
+        
+        {% if survey_responses %}
+            <div class="row g-3">
+                {% for resp in survey_responses %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="p-3 rounded-4 border bg-light h-100">
+                            <div class="small text-muted mb-1">Pregunta {{ forloop.counter }}</div>
+                            <div class="fw-bold mb-2" style="font-size: 0.9rem;">{{ resp.question.text }}</div>
+                            <span class="badge rounded-pill {% if resp.response == 'Sí' %}bg-success{% else %}bg-danger{% endif %} px-3 py-2 fw-bold">
+                                {{ resp.response }}
+                            </span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning border-0 rounded-3 mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i> El paciente aún no ha completado la encuesta de salud.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Historial Detallado de Sesiones -->
+<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="fw-bold mb-0"><i class="fas fa-list-alt me-2 text-secondary"></i> Historial Detallado de Ejercicios</h5>
+            <span class="badge rounded-pill {% if improvement_total >= 0 %}bg-success{% else %}bg-danger{% endif %} px-3 py-2 fs-6">
+                Cambio Histórico: {{ improvement_total }}%
+            </span>
+        </div>
+
+        {% if session_rows %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border-top">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="py-3">N° Sesión</th>
+                            <th class="py-3">Fecha</th>
+                            <th class="py-3">Ejercicio</th>
+                            <th class="py-3">Estabilidad</th>
+                            <th class="py-3">Desviación</th>
+                            <th class="py-3">Calidad</th>
+                            <th class="py-3">Mejora vs Previa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in session_rows reversed %}
+                        <tr>
+                            <td class="fw-bold text-secondary">#{{ row.session_number }}</td>
+                            <td>{{ row.timestamp }}</td>
+                            <td class="fw-semibold">{{ row.test_type }}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ row.stability }}%;"></div>
+                                    </div>
+                                    <span style="min-width: 45px;">{{ row.stability }}%</span>
+                                </div>
+                            </td>
+                            <td>{{ row.deviation_cm }} cm</td>
+                            <td>
+                                <span class="badge rounded-pill {% if row.quality_semaphore == 'Alta' %}bg-success{% elif row.quality_semaphore == 'Media' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                    {{ row.quality_score }}% {{ row.quality_semaphore }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if row.delta_stability is None %}
+                                    <span class="text-muted small"><i class="fas fa-minus me-1"></i> Base inicial</span>
+                                {% elif row.delta_stability >= 0 %}
+                                    <span class="text-success fw-bold"><i class="fas fa-arrow-up me-1"></i> +{{ row.delta_stability }}%</span>
+                                {% else %}
+                                    <span class="text-danger fw-bold"><i class="fas fa-arrow-down me-1"></i> {{ row.delta_stability }}%</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info border-0 rounded-3 mb-0">
+                <i class="fas fa-info-circle me-2"></i> Aún no hay sesiones registradas.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .metric-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+    }
+</style>
+
+{{ chart_data|json_script:"progress-chart-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const chartNode = document.getElementById('progress-chart-data');
+        if (!chartNode || typeof Chart === 'undefined') return;
+
+        const payload = JSON.parse(chartNode.textContent);
+        if (!payload.labels || payload.labels.length === 0) return;
+
+        const trendCtx = document.getElementById('trendChart');
+        const exerciseCtx = document.getElementById('exerciseChart');
+
+        if (trendCtx) {
+            new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: payload.labels,
+                    datasets: [
+                        {
+                            label: 'Estabilidad %',
+                            data: payload.stability,
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14,165,233,0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#0ea5e9',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Desviación cm',
+                            data: payload.deviation,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            yAxisID: 'y1',
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#f59e0b',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 34, 0.9)', padding: 12, cornerRadius: 8 }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
+                        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        if (exerciseCtx) {
+            new Chart(exerciseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: payload.exerciseLabels,
+                    datasets: [{
+                        data: payload.exerciseSessions,
+                        backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 34, 0.9)', padding: 12 }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

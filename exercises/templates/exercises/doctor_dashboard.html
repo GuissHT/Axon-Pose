@@ -1,0 +1,139 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Axon-Pose | Dashboard Doctor{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px;">
+    <h1 class="fw-bold mb-2"><i class="fas fa-user-md me-2"></i> Dashboard del Doctor</h1>
+    <div class="d-flex gap-2">
+        <p class="mb-0 flex-grow-1">Administra pacientes, revisa resultados y publica recomendaciones globales.</p>
+        <a href="{% url 'gestionar_preguntas' %}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">
+            <i class="fas fa-edit me-2"></i> Gestionar Encuesta
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body">
+                <small class="text-muted">Pacientes registrados</small>
+                <h3 class="fw-bold">{{ patient_count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body">
+                <small class="text-muted">Encuestas completadas</small>
+                <h3 class="fw-bold">{{ questionnaire_completed }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body">
+                <small class="text-muted">Sesiones de ejercicios</small>
+                <h3 class="fw-bold">{{ session_count }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Publicar consejo global</h5>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ advice_form.non_field_errors }}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ advice_form.title.label }}</label>
+                        {{ advice_form.title }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ advice_form.message.label }}</label>
+                        {{ advice_form.message }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ advice_form.is_active }}
+                        <label class="form-check-label">{{ advice_form.is_active.label }}</label>
+                    </div>
+                    <button class="btn btn-primary w-100">Publicar</button>
+                </form>
+                <hr>
+                <h6 class="fw-bold">Últimos consejos</h6>
+                <ul class="list-unstyled mb-0">
+                    {% for advice in latest_advices %}
+                        <li class="mb-3 p-2 rounded border bg-light">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ advice.title }}</strong><br>
+                                    <small class="text-secondary">{{ advice.message|truncatechars:90 }}</small>
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'editar_consejo' advice.id %}" class="btn btn-sm btn-outline-primary py-0 px-1" title="Editar"><i class="fas fa-edit small"></i></a>
+                                    <a href="{% url 'eliminar_consejo' advice.id %}" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('¿Eliminar este consejo?')" title="Eliminar"><i class="fas fa-trash small"></i></a>
+                                </div>
+                            </div>
+                        </li>
+                    {% empty %}
+                        <li>No hay consejos publicados.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-calendar-alt text-primary me-2"></i> Próximas Citas</h5>
+                    <a href="{% url 'agendar_cita' %}" class="btn btn-sm btn-outline-primary rounded-pill">Ver agenda completa</a>
+                </div>
+                
+                <div class="appointment-list">
+                    {% for appointment in upcoming_appointments %}
+                        <div class="d-flex align-items-center p-3 mb-3 rounded-4 border bg-white shadow-sm hover-elevate" style="transition: transform 0.2s;">
+                            <div class="date-badge text-center me-3 p-2 rounded-3 bg-primary text-white" style="min-width: 65px;">
+                                <div class="small fw-bold text-uppercase">{{ appointment.date|date:"M" }}</div>
+                                <div class="fs-4 fw-bold">{{ appointment.date|date:"d" }}</div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold text-dark">{{ appointment.patient.get_full_name|default:appointment.patient.username }}</div>
+                                <div class="text-muted small"><i class="far fa-clock me-1"></i> {{ appointment.date|date:"H:i" }} - {{ appointment.reason }}</div>
+                            </div>
+                            <div class="status">
+                                <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle px-3">Pendiente</span>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="text-center py-5">
+                            <i class="far fa-calendar-times fa-3x mb-3 text-muted opacity-25"></i>
+                            <p class="text-muted">No tienes citas programadas para hoy.</p>
+                            <a href="{% url 'agendar_cita' %}" class="btn btn-primary rounded-pill px-4">Programar una cita</a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-info-subtle { background-color: #e0f2fe !important; }
+.hover-elevate:hover { transform: translateY(-3px); }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const inputs = document.querySelectorAll("input, textarea");
+    inputs.forEach(input => {
+        if (input.type === "checkbox") return;
+        input.classList.add("form-control");
+    });
+});
+</script>
+{% endblock %}

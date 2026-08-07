@@ -1,0 +1,212 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Gestión de Pacientes | Axon-Pose{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0 text-dark"><i class="fas fa-users me-2"></i> Gestión de Pacientes</h2>
+    <button class="btn btn-primary rounded-pill px-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#registrationForm" aria-expanded="{% if form.errors or editing %}true{% else %}false{% endif %}" aria-controls="registrationForm">
+        <i class="fas fa-user-plus me-2"></i> {% if editing %}Modificar datos{% else %}Registrar Paciente{% endif %}
+    </button>
+</div>
+
+<!-- Formulario de Registro (Colapsable) -->
+<div class="collapse {% if form.errors or editing %}show{% endif %} mb-5" id="registrationForm">
+    <div class="auth-card shadow-lg border-0" style="max-width: 900px; margin: 0 auto; background: white; border-radius: 20px;">
+        <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">{% if editing %}Editar Datos: {{ patient.get_full_name }}{% else %}Nueva Cuenta de Paciente{% endif %}</h3>
+                <p class="text-muted">Complete los campos para el perfil clínico y de acceso.</p>
+            </div>
+
+            <!-- autocomplete="off" y novalidate para evitar interferencias del navegador -->
+            <form method="POST" id="patient-register-form" autocomplete="off" novalidate>
+                {% csrf_token %}
+                
+                <!-- Dummy fields to consume browser autofill -->
+                <input type="text" name="prevent_autofill_user" style="display:none" aria-hidden="true">
+                <input type="password" name="prevent_autofill_pass" style="display:none" aria-hidden="true">
+
+                {{ form.non_field_errors }}
+                {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+
+                <h5 class="fw-semibold mb-3 border-bottom pb-2"><i class="fas fa-user me-2 text-primary"></i>Datos Personales</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.first_name.label }}</label>
+                        {{ form.first_name }}
+                        {% if form.first_name.errors %}<div class="text-danger small mt-1">{{ form.first_name.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.last_name.label }}</label>
+                        {{ form.last_name }}
+                        {% if form.last_name.errors %}<div class="text-danger small mt-1">{{ form.last_name.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.ci.label }}</label>
+                        {{ form.ci }}
+                        {% if form.ci.errors %}<div class="text-danger small mt-1">{{ form.ci.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.age.label }}</label>
+                        {{ form.age }}
+                        {% if form.age.errors %}<div class="text-danger small mt-1">{{ form.age.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.phone.label }}</label>
+                        {{ form.phone }}
+                        <div class="form-text text-muted small">{{ form.phone.help_text }}</div>
+                        {% if form.phone.errors %}<div class="text-danger small mt-1">{{ form.phone.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.email.label }}</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.username.label }}</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}<div class="text-danger small mt-1">{{ form.username.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                {% if not editing %}
+                <h5 class="fw-semibold mb-3 mt-4 border-bottom pb-2"><i class="fas fa-lock me-2 text-primary"></i>Contraseña de Acceso</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.password.label }}</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}<div class="text-danger small mt-1">{{ form.password.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.password_confirm.label }}</label>
+                        {{ form.password_confirm }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <h5 class="fw-semibold mb-3 mt-4 border-bottom pb-2"><i class="fas fa-notes-medical me-2 text-primary"></i>Antecedentes Clínicos</h5>
+                <div class="row text-start">
+                    <div class="col-12 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.patient_data.label }}</label>
+                        {{ form.patient_data }}
+                        <div class="form-text text-muted small">{{ form.patient_data.help_text }}</div>
+                        {% if form.patient_data.errors %}<div class="text-danger small mt-1">{{ form.patient_data.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <h5 class="fw-semibold mb-3 mt-4 border-bottom pb-2"><i class="fas fa-phone-alt me-2 text-primary"></i>Contacto de Referencia (Familiar)</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.emergency_contact_name.label }}</label>
+                        {{ form.emergency_contact_name }}
+                        {% if form.emergency_contact_name.errors %}<div class="text-danger small mt-1">{{ form.emergency_contact_name.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.emergency_contact_relationship.label }}</label>
+                        {{ form.emergency_contact_relationship }}
+                        {% if form.emergency_contact_relationship.errors %}<div class="text-danger small mt-1">{{ form.emergency_contact_relationship.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.emergency_contact_phone.label }}</label>
+                        {{ form.emergency_contact_phone }}
+                        <div class="form-text text-muted small">{{ form.emergency_contact_phone.help_text }}</div>
+                        {% if form.emergency_contact_phone.errors %}<div class="text-danger small mt-1">{{ form.emergency_contact_phone.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.emergency_contact_address.label }}</label>
+                        {{ form.emergency_contact_address }}
+                        {% if form.emergency_contact_address.errors %}<div class="text-danger small mt-1">{{ form.emergency_contact_address.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.emergency_contact_email.label }} <span class="text-muted small">(Opcional)</span></label>
+                        {{ form.emergency_contact_email }}
+                        {% if form.emergency_contact_email.errors %}<div class="text-danger small mt-1">{{ form.emergency_contact_email.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4 gap-2">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill fw-bold shadow-sm" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none;">
+                        <i class="fas fa-user-check me-2"></i>{% if editing %}Guardar cambios{% else %}Finalizar registro{% endif %}
+                    </button>
+                    {% if editing or form.errors %}
+                    <a href="{% url 'registrar_paciente' %}" class="btn btn-light btn-lg rounded-pill fw-bold">Cancelar / Cerrar</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Listado de Pacientes -->
+<div class="card border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-4">Pacientes registrados actualmente</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="border-0 rounded-start">ID</th>
+                        <th class="border-0">Nombre Completo</th>
+                        <th class="border-0">CI</th>
+                        <th class="border-0">Edad</th>
+                        <th class="border-0">Celular</th>
+                        <th class="border-0">Fecha Registro</th>
+                        <th class="border-0 rounded-end text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in pacientes %}
+                    <tr>
+                        <td><span class="badge bg-light text-dark">#{{ p.user.id }}</span></td>
+                        <td>
+                            <div class="fw-bold">{{ p.user.get_full_name|default:p.user.username }}</div>
+                            <small class="text-muted">@{{ p.user.username }}</small>
+                        </td>
+                        <td class="small fw-semibold">{{ p.ci|default:"—" }}</td>
+                        <td>{{ p.age|default:"—" }}</td>
+                        <td>{{ p.phone }}</td>
+                        <td class="small text-muted">{{ p.user.date_joined|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            <div class="btn-group shadow-sm rounded-pill bg-white">
+                                <a href="{% url 'editar_paciente' p.user.id %}" class="btn btn-sm btn-outline-primary border-0 py-2 px-3" title="Editar"><i class="fas fa-user-edit"></i></a>
+                                <a href="{% url 'eliminar_paciente' p.user.id %}" class="btn btn-sm btn-outline-danger border-0 py-2 px-3" onclick="return confirm('¿Eliminar paciente?')" title="Eliminar"><i class="fas fa-trash-alt"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fas fa-user-friends fa-3x mb-3 opacity-25"></i><br>
+                            No hay pacientes registrados en el sistema.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const form = document.getElementById("patient-register-form");
+        if (form) {
+            form.querySelectorAll("input, textarea").forEach(function(el) {
+                if (el.type !== "hidden" && el.type !== "checkbox") {
+                    el.classList.add("form-control", "rounded-3");
+                    // Desactivar autocompletado agresivamente
+                    if (!el.getAttribute("autocomplete")) {
+                        el.setAttribute("autocomplete", "new-password");
+                    }
+                }
+            });
+            form.querySelectorAll("select").forEach(function(el) {
+                el.classList.add("form-select", "rounded-3");
+            });
+        }
+    });
+</script>
+{% endblock %}

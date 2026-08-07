@@ -1,0 +1,40 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Editar Pregunta | Axon-Pose{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-lg rounded-4">
+            <div class="card-body p-5">
+                <h3 class="fw-bold mb-4 text-center">Editar Pregunta</h3>
+                
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark">{{ form.text.label }}</label>
+                        {{ form.text }}
+                        {% if form.text.errors %}<div class="text-danger small">{{ form.text.errors }}</div>{% endif %}
+                    </div>
+                    <div class="mb-4 form-check form-switch">
+                        {{ form.is_active }}
+                        <label class="form-check-label fw-bold text-dark ms-2">{{ form.is_active.label }}</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold">Guardar Cambios</button>
+                        <a href="{% url 'gestionar_preguntas' %}" class="btn btn-light btn-lg rounded-pill fw-bold">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelector("input[type='text']").classList.add("form-control", "form-control-lg", "rounded-3");
+        document.querySelector("input[type='checkbox']").classList.add("form-check-input");
+    });
+</script>
+{% endblock %}

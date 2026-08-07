@@ -1,0 +1,135 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Gestión de Doctores | Axon-Pose{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0 text-dark"><i class="fas fa-user-md me-2"></i> Gestión de Doctores</h2>
+    <button class="btn btn-info text-white rounded-pill px-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#doctorForm" aria-expanded="{% if form.errors %}true{% else %}false{% endif %}" aria-controls="doctorForm">
+        <i class="fas fa-plus-circle me-2"></i> Registrar Nuevo Doctor
+    </button>
+</div>
+
+<!-- Formulario de Registro de Doctor (Colapsable) -->
+<div class="collapse {% if form.errors %}show{% endif %} mb-5" id="doctorForm">
+    <div class="auth-card shadow-lg border-0" style="max-width: 800px; margin: 0 auto; background: white; border-radius: 20px;">
+        <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">Nuevo Perfil de Doctor</h3>
+                <p class="text-muted">Complete los datos profesionales y de acceso para el nuevo especialista.</p>
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+
+                <h5 class="fw-semibold mb-3 border-bottom pb-2">Información Profesional</h5>
+                <div class="row text-start">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.first_name.label }}</label>
+                        {{ form.first_name }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.last_name.label }}</label>
+                        {{ form.last_name }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.specialty.label }}</label>
+                        {{ form.specialty }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.phone.label }}</label>
+                        {{ form.phone }}
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.email.label }}</label>
+                        {{ form.email }}
+                    </div>
+                </div>
+
+                <h5 class="fw-semibold mb-3 mt-4 border-bottom pb-2">Credenciales de Acceso</h5>
+                <div class="row text-start">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.username.label }}</label>
+                        {{ form.username }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.password.label }}</label>
+                        {{ form.password }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold text-secondary">{{ form.password_confirm.label }}</label>
+                        {{ form.password_confirm }}
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none;">
+                        Crear Cuenta de Doctor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Listado de Doctores -->
+<div class="card border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-4">Especialistas Registrados</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="border-0 rounded-start">Doctor</th>
+                        <th class="border-0">Especialidad</th>
+                        <th class="border-0">Contacto</th>
+                        <th class="border-0">Correo</th>
+                        <th class="border-0 rounded-end">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in doctores %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold">{{ doc.user.get_full_name|default:doc.user.username }}</div>
+                            <small class="text-muted">@{{ doc.user.username }}</small>
+                        </td>
+                        <td><span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill">{{ doc.specialty }}</span></td>
+                        <td>{{ doc.phone }}</td>
+                        <td>{{ doc.user.email }}</td>
+                        <td>
+                            {% if doc.user.is_staff %}
+                            <span class="text-success"><i class="fas fa-check-circle me-1"></i> Admin</span>
+                            {% else %}
+                            <span class="text-muted">Doctor</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No hay otros doctores registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-soft-primary { background-color: #e0f2fe; }
+    .text-primary { color: #0284c7; }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll("input, select, textarea");
+        inputs.forEach(input => {
+            if (input.type !== "hidden" && input.type !== "checkbox") {
+                input.classList.add("form-control", "rounded-3");
+            }
+        });
+    });
+</script>
+{% endblock %}

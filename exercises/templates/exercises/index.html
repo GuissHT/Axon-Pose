@@ -1,0 +1,72 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Ejercicios{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    <h1 class="fw-bold mb-2"><i class="fas fa-running me-2"></i> Diagnóstico Funcional para Equilibrio</h1>
+    <p class="mb-3" style="font-size: 1.1rem; opacity: 0.9;">
+        Este módulo organiza pruebas Estática, Monopodal y Tándem para iniciar la evaluación con cámara y esqueletización en tiempo real.
+    </p>
+    <a href="{% url 'evaluacion' %}" class="btn btn-warning btn-lg px-4 fw-bold rounded-pill shadow-sm"><i class="fas fa-camera me-2"></i> Iniciar Evaluación</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card card-test h-100 border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); transition: transform 0.2s;">
+            <div class="card-body p-4 d-flex flex-column">
+                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Prueba 01</span>
+                <div class="image-slot mb-3" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px;">
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/estatico.png' %}" alt="Imagen ejercicio estático" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="image-placeholder">Equilibrio Estático</div>
+                </div>
+                <h5 class="card-title fw-bold text-dark">Equilibrio Estático</h5>
+                <p class="card-text text-secondary mb-4 flex-grow-1">Valora control postural sin desplazamiento durante 30 segundos.</p>
+                <a class="btn btn-outline-primary w-100 fw-bold rounded-pill" href="{% url 'ejercicio_estatico' %}">Ver Detalles</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card card-test h-100 border-0 shadow rounded-4 highlight" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; transform: scale(1.02);">
+            <div class="card-body p-4 d-flex flex-column">
+                <span class="badge bg-warning text-dark mb-3 align-self-start px-3 py-2 rounded-pill shadow-sm">Prueba 02 - Recomendada</span>
+                <div class="image-slot mb-3 shadow-sm" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px; border: 2px solid rgba(255,255,255,0.2);">
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/monopodal.png' %}" alt="Imagen ejercicio monopodal" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="image-placeholder text-dark bg-white">Soporte Monopodal</div>
+                </div>
+                <h5 class="card-title fw-bold">Soporte Monopodal</h5>
+                <p class="card-text mb-4 flex-grow-1" style="opacity: 0.9;">Mide compensaciones y estabilidad con una sola base de apoyo.</p>
+                <a class="btn btn-warning w-100 fw-bold rounded-pill shadow" href="{% url 'ejercicio_monopodal' %}">Ver Detalles</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card card-test h-100 border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); transition: transform 0.2s;">
+            <div class="card-body p-4 d-flex flex-column">
+                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Prueba 03</span>
+                <div class="image-slot mb-3" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px;">
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/tandem.jpg' %}" alt="Imagen ejercicio tándem" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="image-placeholder">Agregar imagen del ejercicio tándem aquí: static/exercises/img/ejercicios/tandem.jpg</div>
+                </div>
+                <h5 class="card-title fw-bold text-dark">Marcha Tándem</h5>
+                <p class="card-text text-secondary mb-4 flex-grow-1">Observa alineación y variación lateral con pies en línea.</p>
+                <a class="btn btn-outline-primary w-100 fw-bold rounded-pill" href="{% url 'ejercicio_tandem' %}">Ver Detalles</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-test:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+    }
+    .highlight:hover {
+        transform: scale(1.02) translateY(-5px) !important;
+        box-shadow: 0 20px 40px rgba(2, 132, 199, 0.3) !important;
+    }
+</style>
+{% endblock %}

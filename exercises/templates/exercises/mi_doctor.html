@@ -1,0 +1,102 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Mi Doctor{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    <h1 class="fw-bold mb-2"><i class="fas fa-user-md me-2"></i> Mi doctor</h1>
+    <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">
+        Revise los especialistas disponibles en el programa y envíeles su reporte clínico detallado de manera segura.
+    </p>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                        <i class="fas fa-stethoscope fa-2x text-success"></i>
+                    </div>
+                    <h5 class="fw-bold mb-0 text-dark">Especialistas disponibles</h5>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle border-top">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="py-3">Especialista</th>
+                                <th class="py-3">Modalidad</th>
+                                <th class="py-3">Contacto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doctor in doctors %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ doctor.name }}</div>
+                                    <small class="text-secondary"><i class="fas fa-tag me-1"></i> {{ doctor.specialty }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info text-dark rounded-pill">Tele-rehabilitación</span>
+                                </td>
+                                <td>
+                                    <a href="mailto:{{ doctor.email }}" class="text-decoration-none text-primary fw-semibold">
+                                        <i class="fas fa-envelope me-1"></i> {{ doctor.email|default:"Sin correo" }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle me-3">
+                        <i class="fas fa-file-medical fa-2x text-warning"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">Reporte Clínico en PDF</h5>
+                        <p class="text-secondary small mb-0">Envíe sus métricas directamente al especialista</p>
+                    </div>
+                </div>
+
+                <a class="btn btn-outline-primary w-100 mb-4 fw-bold rounded-pill" href="{% url 'descargar_reporte_pdf' %}">
+                    <i class="fas fa-download me-2"></i> Descargar mi reporte (PDF)
+                </a>
+
+                <hr class="mb-4" style="border-color: rgba(0,0,0,0.1);">
+
+                <form method="post" action="{% url 'enviar_reporte_doctor' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="doctorEmail" class="form-label fw-bold text-dark">Enviar a especialista:</label>
+                        <select id="doctorEmail" name="doctor_email" class="form-select border-0 bg-light shadow-sm" style="border-radius: 10px;" required>
+                            <option value="" selected disabled>Seleccione un doctor...</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.email }}">{{ doctor.name }} ({{ doctor.specialty }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="observaciones" class="form-label fw-bold text-dark">Notas para el doctor:</label>
+                        <textarea id="observaciones" name="observaciones" class="form-control border-0 bg-light shadow-sm" style="border-radius: 10px;" rows="4" placeholder="Ej. He sentido mejoría en mi rodilla derecha, pero al hacer el ejercicio Tándem me mareo un poco."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-100 fw-bold rounded-pill shadow-sm" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white;">
+                        <i class="fas fa-paper-plane me-2"></i> Enviar Reporte por Correo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

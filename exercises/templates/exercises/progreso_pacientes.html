@@ -1,0 +1,90 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Progreso de Pacientes | Axon-Pose{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 2rem; border-radius: 20px;">
+    <h1 class="fw-bold mb-2"><i class="fas fa-chart-line me-2"></i> Seguimiento de Pacientes</h1>
+    <p class="mb-0 opacity-90">Monitorea el cumplimiento de ejercicios y la evolución de la estabilidad de cada paciente.</p>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9);">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="border-0 rounded-start py-3">Paciente</th>
+                        <th class="border-0 py-3 text-center">Sesiones</th>
+                        <th class="border-0 py-3 text-center">Estabilidad Prom.</th>
+                        <th class="border-0 py-3 text-center">Encuesta</th>
+                        <th class="border-0 py-3">Última Actividad</th>
+                        <th class="border-0 py-3">Estado</th>
+                        <th class="border-0 rounded-end py-3 text-end">Análisis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients_summary %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark fs-6">{{ p.full_name }}</div>
+                            <small class="text-muted">CI: {{ p.ci }} | ID: #{{ p.user_id|stringformat:"04d" }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill bg-light text-dark border px-3">{{ p.sessions_count }}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="fw-bold {% if p.avg_stability >= 80 %}text-success{% elif p.avg_stability >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ p.avg_stability }}%
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if p.survey_status == 'Completo' %}
+                                <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle px-3">Completo</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle px-3">No completo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.last_activity %}
+                                <div class="small">{{ p.last_activity|date:"d M Y" }}</div>
+                                <div class="text-muted smaller">{{ p.last_activity|date:"H:i" }}</div>
+                            {% else %}
+                                <span class="text-muted small">Sin registros</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.status == 'Activo' %}
+                                <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3">Activo</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-3">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'progreso_paciente' p.user_id %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                                <i class="fas fa-eye me-1"></i> Ver Detalles
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fas fa-users-slash fa-3x mb-3 opacity-25"></i><br>
+                            No hay pacientes registrados en el sistema.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-success-subtle { background-color: #dcfce7 !important; }
+    .bg-secondary-subtle { background-color: #f3f4f6 !important; }
+    .bg-info-subtle { background-color: #e0f2fe !important; }
+    .bg-warning-subtle { background-color: #fef3c7 !important; }
+    .smaller { font-size: 0.75rem; }
+</style>
+{% endblock %}

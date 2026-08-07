@@ -1,0 +1,62 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# Django
+# SQLite database file
+db.sqlite3
+# Ignore media and collected static files
+media/
+staticfiles/
+
+# Environment variables
+.env
+.venv
+
+# Pytest
+.cache
+.pytest_cache/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+
+# Mypy / type checkers
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Pycharm
+*.iml
+
+# Jupyter
+.ipynb_checkpoints/

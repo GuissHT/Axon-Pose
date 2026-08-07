@@ -1,0 +1,74 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Ejercicio Tándem{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <span class="badge bg-primary mb-2 px-3 py-2 rounded-pill shadow-sm">Prueba 03</span>
+            <h1 class="fw-bold mb-2"><i class="fas fa-shoe-prints me-2"></i> Marcha Tándem</h1>
+            <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">Mejora la estabilidad dinámica al mantener pies en línea talón-punta con control de tronco.</p>
+        </div>
+        <a class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm px-4" href="{% url 'evaluacion' %}?exercise=Marcha%20Tandem">
+            <i class="fas fa-play-circle me-2"></i> Practicar en evaluación
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4">
+                <div class="image-slot mb-4 shadow-sm" data-image-slot style="border-radius: 16px; overflow: hidden; border: 3px solid #f8fafc;">
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/tandem_detalle.jpg' %}" alt="Detalle ejercicio tándem" style="width: 100%; object-fit: cover;">
+                    <div class="image-placeholder bg-light text-dark p-5 text-center">Agregar imagen del ejercicio tándem aquí:<br><small class="text-muted">static/exercises/img/ejercicios/tandem_detalle.jpg</small></div>
+                </div>
+                
+                <h5 class="fw-bold text-dark mb-3"><i class="fas fa-list-ol text-primary me-2"></i> Indicaciones paso a paso</h5>
+                <ul class="list-group list-group-flush border-0">
+                    <li class="list-group-item bg-transparent px-0 border-bottom border-light">
+                        <i class="fas fa-check-circle text-success me-2"></i> Ubicar un pie delante del otro en línea recta (talón toca la punta).
+                    </li>
+                    <li class="list-group-item bg-transparent px-0 border-bottom border-light">
+                        <i class="fas fa-check-circle text-success me-2"></i> Distribuir peso de manera uniforme en ambos pies.
+                    </li>
+                    <li class="list-group-item bg-transparent px-0 border-0">
+                        <i class="fas fa-check-circle text-success me-2"></i> Mantener cabeza al frente y tronco alineado.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold text-dark mb-4"><i class="fas fa-heartbeat text-danger me-2"></i> Recomendaciones clínicas</h5>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-warning">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-stopwatch text-warning me-2"></i> Duración</h6>
+                            <p class="mb-0 text-secondary small">Practicar 20-30 segundos por repetición, alternando el pie delantero.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-info">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-sync-alt text-info me-2"></i> Series</h6>
+                            <p class="mb-0 text-secondary small">Completar 3 series con descansos breves entre cada una.</p>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-3 bg-danger bg-opacity-10 rounded-3 h-100 border-start border-4 border-danger">
+                            <h6 class="fw-bold text-danger"><i class="fas fa-exclamation-triangle me-2"></i> Precaución</h6>
+                            <p class="mb-0 text-dark small">Reducir la velocidad o usar un pasillo estrecho para apoyarse si aparece inestabilidad marcada.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

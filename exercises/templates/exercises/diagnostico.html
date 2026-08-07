@@ -1,0 +1,160 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Diagnóstico{% endblock %}
+
+{% block content %}
+<section class="diagnostic-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; min-height: 75vh;">
+    <article class="info-panel" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+        <span class="badge bg-primary mb-2 align-self-start px-3 py-2 rounded-pill"><i class="fas fa-stethoscope me-1"></i> Fase de Evaluación</span>
+        <h1 class="fw-bold mb-3">Evaluación inicial de equilibrio</h1>
+        <p class="text-secondary" style="font-size: 1.1rem;">Siga las instrucciones y mantenga la posición por 30 segundos para obtener estabilidad y desviación lateral en tiempo real.</p>
+
+        <div class="card border-0 bg-light rounded-4 mb-3" style="border-left: 4px solid #1f5d88 !important;">
+            <div class="card-body">
+                <h5 class="fw-bold text-dark"><i class="fas fa-info-circle me-2 text-primary"></i> Instrucción principal</h5>
+                <p class="mb-0">Mantenga la postura indicada, con mirada al frente y hombros alineados frente a la cámara.</p>
+            </div>
+        </div>
+
+        <div class="mt-auto">
+            <label for="testTypeSelect" class="form-label fw-bold text-dark mb-2">Tipo de prueba actual:</label>
+            <select id="testTypeSelect" class="form-select form-select-lg shadow-sm border-0 mb-4" style="background-color: #f8fafc;">
+                <option value="Equilibrio Estatico" {% if selected_exercise == 'Equilibrio Estatico' %}selected{% endif %}>Equilibrio Estático</option>
+                <option value="Soporte Monopodal" {% if selected_exercise == 'Soporte Monopodal' %}selected{% endif %}>Soporte Monopodal</option>
+                <option value="Marcha Tandem" {% if selected_exercise == 'Marcha Tandem' %}selected{% endif %}>Marcha Tándem</option>
+            </select>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold text-secondary">Progreso del test (30s)</span>
+                <span id="timerLabel" class="fw-bold text-primary fs-4">00:30</span>
+            </div>
+            <div class="progress mb-4 rounded-pill" style="height: 12px; background-color: #e2e8f0;">
+                <div id="testProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill" style="width: 0%"></div>
+            </div>
+
+            <div class="d-grid gap-3 d-sm-flex">
+                <button id="btnStartEval" class="btn btn-warning btn-lg flex-fill fw-bold rounded-pill shadow-sm" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white;">
+                    <i class="fas fa-play me-2"></i> Comenzar evaluación
+                </button>
+                <button id="btnStopEval" class="btn btn-outline-secondary btn-lg flex-fill fw-bold rounded-pill" disabled>
+                    <i class="fas fa-stop me-2"></i> Detener
+                </button>
+            </div>
+        </div>
+    </article>
+
+    <article class="video-panel position-relative" style="background: #0f172a; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); min-height: 400px; display: flex; flex-direction: column;">
+        <div class="d-flex justify-content-between p-3 position-absolute w-100 z-1">
+            <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill shadow"><i class="fas fa-video-slash me-1"></i> Cámara inactiva</span>
+            <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill shadow"><i class="fas fa-ruler-combined me-1"></i> Alineación en espera</span>
+        </div>
+
+        <div class="camera-stage flex-grow-1 position-relative" style="display: flex; justify-content: center; align-items: center; background-color: #000;">
+            <video id="webcam" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; position: absolute; transform: scaleX(-1);"></video>
+            <canvas id="output_canvas" style="width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 10;"></canvas>
+            <div id="cameraPlaceholder" class="text-white text-center z-0">
+                <i class="fas fa-camera fa-3x mb-3 text-secondary"></i>
+                <p class="mb-0 text-secondary">Presiona "Comenzar evaluación" para activar la cámara</p>
+            </div>
+        </div>
+
+        <div class="metrics-overlay p-3 d-flex gap-2 position-absolute bottom-0 w-100" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); z-index: 20;">
+            <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
+                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Estabilidad %</small>
+                <div id="metricStability" class="text-white fw-bold fs-4">0%</div>
+            </div>
+            <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
+                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Desviación cm</small>
+                <div id="metricDeviation" class="text-white fw-bold fs-4">0.0 cm</div>
+            </div>
+        </div>
+    </article>
+</section>
+
+{% if is_doctor %}
+<div class="card border-0 shadow-sm rounded-4 mt-4" style="background: rgba(255, 255, 255, 0.9);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-4 text-dark"><i class="fas fa-users-viewfinder text-primary me-2"></i> Estado de pacientes y evaluación previa</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="border-0 rounded-start">Paciente</th>
+                        <th class="border-0">Última Prueba</th>
+                        <th class="border-0 text-center">Estabilidad (%)</th>
+                        <th class="border-0 text-center">Desviación (cm)</th>
+                        <th class="border-0 text-center">Fecha</th>
+                        <th class="border-0 rounded-end text-end">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient in patient_list %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">{{ patient.full_name }}</div>
+                        </td>
+                        <td>
+                            <span class="text-secondary">{{ patient.last_test }}</span>
+                        </td>
+                        <td class="text-center">
+                            {% if patient.last_stability != 'N/A' %}
+                                <div class="fw-bold {% if patient.last_stability|add:0 >= 80 %}text-success{% elif patient.last_stability|add:0 >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ patient.last_stability }}%
+                                </div>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="fw-semibold">{{ patient.last_deviation }}{% if patient.last_deviation != 'N/A' %} cm{% endif %}</span>
+                        </td>
+                        <td class="text-center text-muted small">
+                            {{ patient.last_date }}
+                        </td>
+                        <td class="text-end">
+                            {% if patient.last_test == 'Ninguna' %}
+                                <span class="badge rounded-pill bg-light text-secondary border">Sin registrar</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">Completado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">No hay pacientes registrados aún.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .bg-primary-subtle { background-color: #e0f2fe !important; }
+    @media (max-width: 991px) {
+        .diagnostic-layout {
+            grid-template-columns: 1fr !important;
+        }
+        .video-panel {
+            height: 500px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Librerias CDN de MediaPipe Pose para analisis en frontend. -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="{% static 'exercises/js/camera.js' %}"></script>
+<script>
+    document.getElementById('btnStartEval').addEventListener('click', function() {
+        const placeholder = document.getElementById('cameraPlaceholder');
+        if(placeholder) placeholder.style.display = 'none';
+    });
+</script>
+{% endblock %}

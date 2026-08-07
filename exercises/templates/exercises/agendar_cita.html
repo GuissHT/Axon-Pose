@@ -1,0 +1,129 @@
+{% extends "exercises/base.html" %}
+
+{% block title %}Axon-Pose | Agendar Cita{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px;">
+    <h1 class="fw-bold mb-2"><i class="fas fa-calendar-check me-2"></i> Gestión de Citas Médicas</h1>
+    <p class="mb-0">Programa tus controles presenciales o teleconsultas con nuestros especialistas.</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Programar nueva cita</h5>
+                <div class="alert alert-info py-2 small mb-4">
+                    <i class="fas fa-user-circle me-1"></i> <strong>Solicitante:</strong> {{ user.get_full_name|default:user.username }}
+                </div>
+                
+                <form method="post" action="{% url 'agendar_cita' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="doctorSelect">Seleccionar Especialista</label>
+                        <select id="doctorSelect" name="doctor_id" class="form-select" required>
+                            <option value="" selected disabled>Elija un doctor...</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.id }}">{{ doctor.name }} ({{ doctor.specialty }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold" for="fechaInput">Fecha</label>
+                            <input id="fechaInput" type="date" name="fecha" class="form-control" required>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold" for="horaInput">Hora</label>
+                            <input id="horaInput" type="time" name="hora" class="form-control" min="08:00" max="18:00" required>
+                            <div class="form-text small">Atención: 08:00 - 18:00</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="motivoInput">Motivo de la consulta</label>
+                        <textarea id="motivoInput" name="motivo" rows="3" class="form-control" placeholder="Describa brevemente el motivo..." required></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold rounded-pill shadow-sm">
+                        Confirmar Agendamiento
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">Mis Citas Programadas</h5>
+
+                {% if appointments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0 rounded-start">Doctor / Especialidad</th>
+                                    <th class="border-0">Fecha y Hora</th>
+                                    <th class="border-0">Motivo</th>
+                                    <th class="border-0 text-center">Estado</th>
+                                    <th class="border-0 rounded-end text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cita in appointments %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ cita.doctor.get_full_name|default:cita.doctor.username }}</div>
+                                        <small class="text-muted">Rehabilitación Física</small>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-primary">{{ cita.date|date:"d/m/Y" }}</div>
+                                        <div class="small text-secondary">{{ cita.date|date:"H:i" }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="small text-truncate" style="max-width: 150px;">{{ cita.reason }}</div>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if cita.is_completed %}
+                                            <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">Finalizada</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle">Programada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <form method="post" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="cancel">
+                                            <input type="hidden" name="cita_id" value="{{ cita.id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="return confirm('¿Desea cancelar esta cita?')" title="Cancelar cita">
+                                                <i class="fas fa-times-circle"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="far fa-calendar-times fa-4x mb-3 text-muted opacity-25"></i>
+                        <h6 class="text-muted">No tienes citas agendadas actualmente.</h6>
+                        <p class="text-muted small">Usa el formulario de la izquierda para programar tu primera consulta.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-success-subtle { background-color: #dcfce7 !important; }
+.bg-warning-subtle { background-color: #fef9c3 !important; }
+</style>
+{% endblock %}
+
