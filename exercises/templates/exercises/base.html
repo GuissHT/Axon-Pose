@@ -18,9 +18,8 @@
     <div class="app-layout">
         <aside class="sidebar">
             <div class="sidebar-brand">
-                <div class="sidebar-logo-slot" data-image-slot>
-                    <img data-image-autoload src="{% static 'exercises/img/logo/axon_logo.png' %}" alt="Logo Axon Pose">
-                    <div class="sidebar-logo-placeholder">Logo aqui<br>static/exercises/img/logo/axon_logo.png</div>
+                <div class="sidebar-logo-slot">
+                    <img src="{% static 'exercises/img/logo.png' %}" alt="Logo Axon Pose" style="width: 100%; height: 100%; object-fit: cover;">        
                 </div>
                 <div class="sidebar-brand-title">
                     <h2>AXON-POSE</h2>
@@ -64,7 +63,7 @@
                                 <div class="fw-bold text-dark" style="font-size: 0.95rem;">{{ user.get_full_name|default:user.username }}</div>
                                 <div class="text-muted" style="font-size: 0.8rem;">{{ user.profile.get_role_display|default:"Paciente" }}</div>
                             </div>
-                            <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 42px; height: 42px; font-weight: bold; font-size: 1.2rem;">
+                            <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px; font-weight: bold; font-size: 1rem;">
                                 {{ user.username|make_list|first|upper }}
                             </div>
                         </a>
