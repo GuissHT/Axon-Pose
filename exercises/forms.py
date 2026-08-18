@@ -61,24 +61,24 @@ class UserRegisterForm(forms.ModelForm):
     # --- Contacto de Referencia (Familiar) ---
     emergency_contact_name = forms.CharField(
         max_length=150,
-        required=True,
+        required=False,
         label='Nombre del Familiar Responsable',
         widget=forms.TextInput(attrs={'placeholder': 'Ej: Juan Pérez'}),
     )
     emergency_contact_relationship = forms.ChoiceField(
         choices=Profile.RELATIONSHIP_CHOICES,
-        required=True,
+        required=False,
         label='Parentesco con el Paciente',
     )
     emergency_contact_phone = forms.CharField(
         max_length=8,
-        required=True,
+        required=False,
         label='Celular del Familiar',
         widget=forms.TextInput(attrs={'placeholder': '71234567', 'maxlength': '8'}),
     )
     emergency_contact_address = forms.CharField(
         max_length=255,
-        required=True,
+        required=False,
         label='Dirección del Familiar',
         widget=forms.TextInput(attrs={'placeholder': 'Dirección exacta...'}),
     )
@@ -114,7 +114,10 @@ class UserRegisterForm(forms.ModelForm):
 
     def _validate_bolivian_phone(self, value, field_label):
         """Función interna para validar que los celulares tengan 8 dígitos (Bolivia)."""
-        digits_only = ''.join(ch for ch in (value or '') if ch.isdigit())
+        # Si el valor está vacío, retornar vacío (es opcional)
+        if not value:
+            return ''
+        digits_only = ''.join(ch for ch in value if ch.isdigit())
         if len(digits_only) != 8:
             raise forms.ValidationError(f'{field_label} debe tener 8 dígitos.')
         return digits_only

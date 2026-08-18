@@ -497,14 +497,14 @@ body {
 .image-slot {
     position: relative;
     width: 100%;
-    min-height: 150px;
+    aspect-ratio: 16 / 9;
     border-radius: 12px;
     overflow: hidden;
 }
 
 .image-slot img[data-image-autoload] {
     width: 100%;
-    height: 180px;
+    height: 100%;
     object-fit: cover;
     border-radius: 12px;
     display: none;
@@ -515,7 +515,11 @@ body {
 }
 
 .image-slot .image-placeholder {
-    min-height: 180px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .image-slot .image-placeholder.is-hidden {
