@@ -5,10 +5,17 @@
 {% block content %}
 <div class="hero-panel mb-4" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px;">
     <h1 class="fw-bold mb-2"><i class="fas fa-calendar-check me-2"></i> Gestión de Citas Médicas</h1>
-    <p class="mb-0">Programa tus controles presenciales o teleconsultas con nuestros especialistas.</p>
+    <p class="mb-0">
+        {% if is_doctor %}
+            Consulta la agenda de tus pacientes.
+        {% else %}
+            Consulta cuándo tienes una cita o revisión con tu doctor.
+        {% endif %}
+    </p>
 </div>
 
 <div class="row g-4">
+    {% if is_doctor %}
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9);">
             <div class="card-body p-4">
@@ -55,18 +62,21 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
-    <div class="col-lg-8">
+    <div class="{% if is_doctor %}col-lg-8{% else %}col-12{% endif %}">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9);">
             <div class="card-body p-4">
-                <h5 class="fw-bold mb-4">Mis Citas Programadas</h5>
+                <h5 class="fw-bold mb-4">
+                    {% if is_doctor %}Citas de mis pacientes{% else %}Mi próxima cita y revisiones{% endif %}
+                </h5>
 
                 {% if appointments %}
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="border-0 rounded-start">Doctor / Especialidad</th>
+                                    <th class="border-0 rounded-start">{% if is_doctor %}Paciente{% else %}Doctor / Especialidad{% endif %}</th>
                                     <th class="border-0">Fecha y Hora</th>
                                     <th class="border-0">Motivo</th>
                                     <th class="border-0 text-center">Estado</th>
@@ -77,8 +87,14 @@
                                 {% for cita in appointments %}
                                 <tr>
                                     <td>
-                                        <div class="fw-bold text-dark">{{ cita.doctor.get_full_name|default:cita.doctor.username }}</div>
-                                        <small class="text-muted">Rehabilitación Física</small>
+                                        <div class="fw-bold text-dark">
+                                            {% if is_doctor %}
+                                                {{ cita.patient.get_full_name|default:cita.patient.username }}
+                                            {% else %}
+                                                {{ cita.doctor.get_full_name|default:cita.doctor.username }}
+                                            {% endif %}
+                                        </div>
+                                        {% if not is_doctor %}<small class="text-muted">Revisión con el doctor</small>{% endif %}
                                     </td>
                                     <td>
                                         <div class="fw-semibold text-primary">{{ cita.date|date:"d/m/Y" }}</div>
@@ -94,7 +110,7 @@
                                             <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle">Programada</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">
+                                    {% if is_doctor %}<td class="text-end">
                                         <form method="post" class="d-inline">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="cancel">
@@ -103,7 +119,7 @@
                                                 <i class="fas fa-times-circle"></i>
                                             </button>
                                         </form>
-                                    </td>
+                                    </td>{% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -112,8 +128,12 @@
                 {% else %}
                     <div class="text-center py-5">
                         <i class="far fa-calendar-times fa-4x mb-3 text-muted opacity-25"></i>
-                        <h6 class="text-muted">No tienes citas agendadas actualmente.</h6>
-                        <p class="text-muted small">Usa el formulario de la izquierda para programar tu primera consulta.</p>
+                        <h6 class="text-muted">
+                            {% if is_doctor %}No tienes citas registradas actualmente.{% else %}No tienes citas o revisiones programadas actualmente.{% endif %}
+                        </h6>
+                        {% if not is_doctor %}
+                            <p class="text-muted small mb-0">Tu doctor registrará aquí la fecha y hora de tu próxima revisión.</p>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
@@ -126,4 +146,3 @@
 .bg-warning-subtle { background-color: #fef9c3 !important; }
 </style>
 {% endblock %}
-

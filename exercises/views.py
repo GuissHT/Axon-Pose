@@ -9,11 +9,15 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.mail import EmailMessage
+from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import redirect, render
 
 from .forms import UserRegisterForm, DoctorRegisterForm, QuestionForm, DoctorAdviceForm
-from .models import Profile, ExerciseSession, Question, PatientAnswer, DoctorAdvice, Appointment
+from .models import (
+    Profile, ExerciseSession, Evaluation, DailySession, SessionExerciseDetail,
+    ExerciseRepetition, Question, PatientAnswer, DoctorAdvice, Appointment,
+)
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -448,7 +452,11 @@ def evaluacion(request):
     Si el usuario es doctor, le permite seleccionar un paciente para la prueba.
     """
     exercise = request.GET.get('exercise', 'Marcha Tandem')
-    allowed_exercises = {'Equilibrio Estatico', 'Soporte Monopodal', 'Marcha Tandem'}
+    allowed_exercises = {
+        'Equilibrio Estatico',
+        'Soporte Monopodal',
+        'Marcha Tandem',
+    }
     selected_exercise = exercise if exercise in allowed_exercises else 'Marcha Tandem'
     
     patient_data = []
@@ -464,12 +472,49 @@ def evaluacion(request):
                 'last_date': last_session.created_at.strftime('%d/%m/%y') if last_session else '-'
             })
 
+    evaluation_type = request.GET.get('phase', 'INICIAL').upper()
+    if evaluation_type not in {'INICIAL', 'FINAL'}:
+        evaluation_type = 'INICIAL'
     context = {
         'selected_exercise': selected_exercise,
+        'evaluation_type': evaluation_type,
         'patient_list': patient_data,
         'is_doctor': _is_doctor(request.user)
     }
     return render(request, 'exercises/diagnostico.html', context)
+
+
+@login_required
+def rutina_diaria(request):
+    """Prepara la siguiente sesión diaria sin crear duplicados."""
+    if _is_doctor(request.user):
+        return redirect('evaluacion')
+    requested_day = request.GET.get('day')
+    if requested_day:
+        try:
+            day_number = int(requested_day)
+        except (TypeError, ValueError):
+            return redirect('rutina_diaria')
+    else:
+        day_number = (
+            DailySession.objects.filter(patient=request.user)
+            .order_by('-day_number')
+            .values_list('day_number', flat=True)
+            .first() or 0
+        ) + 1
+    if not 1 <= day_number <= 15:
+        messages.error(request, 'El ciclo de rehabilitación admite días del 1 al 15.')
+        return redirect('ejercicios')
+    session, _ = DailySession.objects.get_or_create(
+        patient=request.user,
+        day_number=day_number,
+        defaults={'status': 'INCOMPLETA'},
+    )
+    return render(request, 'exercises/rutina_diaria.html', {
+        'daily_session': session,
+        'day_number': day_number,
+        'routine': True,
+    })
 
 
 # =============================================================================
@@ -713,14 +758,19 @@ def enviar_reporte_doctor(request):
 
 @login_required
 def agendar_cita(request):
-    """Controlador para la agenda de citas clínicas."""
+    """Muestra la agenda; los pacientes solo pueden consultar sus citas."""
     doctors = _get_available_doctors()
-    if _is_doctor(request.user):
+    is_doctor = _is_doctor(request.user)
+    if is_doctor:
         appointments = Appointment.objects.filter(doctor=request.user).order_by('date')
     else:
         appointments = Appointment.objects.filter(patient=request.user).order_by('date')
 
     if request.method == 'POST':
+        if not is_doctor:
+            messages.error(request, 'Los pacientes no pueden agendar ni cancelar citas.')
+            return redirect('agendar_cita')
+
         action = request.POST.get('action')
         if action == 'cancel':
             Appointment.objects.filter(id=request.POST.get('cita_id')).delete()
@@ -740,7 +790,11 @@ def agendar_cita(request):
                 messages.error(request, f'Error: {str(e)}')
         return redirect('agendar_cita')
 
-    return render(request, 'exercises/agendar_cita.html', {'doctors': doctors, 'appointments': appointments})
+    return render(request, 'exercises/agendar_cita.html', {
+        'doctors': doctors,
+        'appointments': appointments,
+        'is_doctor': is_doctor,
+    })
 
 
 @login_required
@@ -759,18 +813,162 @@ def registrar_metricas(request):
     if request.method == 'POST':
         try:
             payload = json.loads(request.body.decode('utf-8'))
-            ExerciseSession.objects.create(
-                patient=request.user,
-                test_type=payload.get('testType'),
-                stability=payload.get('stability'),
-                deviation_cm=payload.get('deviationCm'),
-                alignment=payload.get('alignment'),
-                quality_score=payload.get('qualityScore')
-            )
+            evaluation_type = payload.get('evaluationType')
+            if evaluation_type in {'INICIAL', 'FINAL'}:
+                exercise_name = payload.get('testType')
+                if exercise_name not in dict(Evaluation.EXERCISE_CHOICES):
+                    raise ValueError('La prueba de evaluación no es válida.')
+                if Evaluation.objects.filter(
+                    patient=request.user,
+                    type=evaluation_type,
+                    exercise_name=exercise_name,
+                ).exists():
+                    return JsonResponse(
+                        {'ok': False, 'error': 'Esta evaluación ya fue registrada.'},
+                        status=409,
+                    )
+                Evaluation.objects.create(
+                    patient=request.user,
+                    type=evaluation_type,
+                    exercise_name=exercise_name,
+                    stability_pct=payload.get('stability', 0),
+                    deviation_cm=payload.get('deviationCm', 0),
+                    angle_deg=payload.get('angleDeg', 0),
+                )
+            else:
+                ExerciseSession.objects.create(
+                    patient=request.user,
+                    test_type=payload.get('testType'),
+                    stability=payload.get('stability'),
+                    deviation_cm=payload.get('deviationCm'),
+                    alignment=payload.get('alignment'),
+                    quality_score=payload.get('qualityScore')
+                )
             return JsonResponse({'ok': True})
-        except Exception as e:
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
             return JsonResponse({'ok': False, 'error': str(e)}, status=400)
     return JsonResponse({'ok': False}, status=405)
+
+
+@login_required
+def registrar_repeticion(request, session_id):
+    """Registra atómicamente el resultado de una repetición de entrenamiento."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+        exercise_name = payload.get('exerciseName')
+        result = payload.get('result')
+        duration = int(payload.get('durationSec', 30))
+        stability = float(payload.get('stabilityPct', 0))
+        deviation = float(payload.get('deviationCm', 0))
+        if exercise_name not in dict(Evaluation.EXERCISE_CHOICES):
+            raise ValueError('Ejercicio no válido.')
+        if result not in {'OK', 'NOK'}:
+            raise ValueError('El resultado debe ser OK o NOK.')
+        if not 1 <= duration <= 30 or not 0 <= stability <= 100 or deviation < 0:
+            raise ValueError('Las métricas de la repetición no son válidas.')
+
+        with transaction.atomic():
+            session = DailySession.objects.select_for_update().get(
+                id=session_id,
+                patient=request.user,
+            )
+            if session.status == 'COMPLETADA':
+                return JsonResponse({'ok': False, 'error': 'La sesión ya está completada.'}, status=409)
+            detail, _ = SessionExerciseDetail.objects.get_or_create(
+                session=session,
+                exercise_name=exercise_name,
+            )
+            ExerciseRepetition.objects.create(
+                detail=detail,
+                result=result,
+                duration_sec=duration,
+                stability_pct=stability,
+                deviation_cm=deviation,
+            )
+            repetitions = detail.repetitions.all()
+            count = repetitions.count()
+            detail.correct_repetitions = repetitions.filter(result='OK').count()
+            detail.incorrect_repetitions = repetitions.filter(result='NOK').count()
+            detail.total_duration_sec = sum(item.duration_sec for item in repetitions)
+            detail.average_stability_pct = sum(float(item.stability_pct) for item in repetitions) / count
+            detail.average_deviation_cm = sum(float(item.deviation_cm) for item in repetitions) / count
+            detail.samples_count = count
+            detail.save()
+        return JsonResponse({'ok': True, 'correct': detail.correct_repetitions, 'incorrect': detail.incorrect_repetitions})
+    except DailySession.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Sesión no encontrada.'}, status=404)
+    except (json.JSONDecodeError, TypeError, ValueError) as error:
+        return JsonResponse({'ok': False, 'error': str(error)}, status=400)
+
+
+@login_required
+def finalizar_rutina(request, session_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+    with transaction.atomic():
+        try:
+            session = DailySession.objects.select_for_update().get(
+                id=session_id, patient=request.user,
+            )
+        except DailySession.DoesNotExist:
+            return JsonResponse({'ok': False, 'error': 'Sesión no encontrada.'}, status=404)
+        expected = set(dict(Evaluation.EXERCISE_CHOICES))
+        completed = set(session.exercise_details.filter(samples_count__gt=0).values_list('exercise_name', flat=True))
+        session.status = 'COMPLETADA' if expected <= completed else 'INCOMPLETA'
+        session.save(update_fields=['status'])
+    return JsonResponse({'ok': True, 'status': session.status})
+
+
+@login_required
+def analizar_pose(request):
+    """Ejecuta el analizador Python correspondiente a la prueba activa."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+        test_type = payload.get('testType')
+        landmarks = payload.get('landmarks')
+        if not isinstance(landmarks, list) or len(landmarks) < 33:
+            raise ValueError('La cámara no envió los 33 puntos corporales.')
+        analyzers = {
+            'Evaluacion inicial': (
+                'exercises.vision.evaluacion',
+                'evaluacion',
+            ),
+            'Equilibrio Estatico': (
+                'exercises.vision.evaluacion',
+                'evaluacion',
+            ),
+            'Marcha Tandem': (
+                'exercises.vision.ejercicio1',
+                'ejercicio1',
+            ),
+            'Postura del Arbol': (
+                'exercises.vision.ejercicio3',
+                'ejercicio3',
+            ),
+            'Soporte Monopodal': (
+                'exercises.vision.ejercicio2',
+                'ejercicio2',
+            ),
+        }
+        if test_type not in analyzers:
+            raise ValueError(f'Prueba no configurada: {test_type or "sin nombre"}.')
+        module_name, _ = analyzers[test_type]
+        module = __import__(module_name, fromlist=['analizar'])
+        result = module.analizar(landmarks)
+        return JsonResponse({'ok': True, **result})
+    except (json.JSONDecodeError, TypeError, ValueError, IndexError, KeyError) as error:
+        return JsonResponse({'ok': False, 'error': str(error)}, status=400)
+    except ImportError as error:
+        return JsonResponse(
+            {'ok': False, 'error': f'No se pudo cargar el modelo: {error}'},
+            status=500,
+        )
+
 
 # --- Funciones de limpieza/edición auxiliar ---
 

@@ -1,6 +1,32 @@
 from django import forms
 from django.contrib.auth.models import User
+import re
+import unicodedata
 from .models import Profile, Question, DoctorAdvice
+
+
+def _suggest_username(first_name, last_name, current_user=None):
+    """Genera un usuario legible y único a partir del nombre completo."""
+    normalized_name = unicodedata.normalize('NFKD', f'{first_name} {last_name}')
+    normalized_name = normalized_name.encode('ascii', 'ignore').decode('ascii')
+    name_parts = re.findall(r'[a-z0-9]+', normalized_name.lower())
+    if not name_parts:
+        return ''
+
+    base = name_parts[0]
+    if len(name_parts) > 1:
+        base += name_parts[1][0]
+
+    candidate = base[:150]
+    suffix = 2
+    while User.objects.filter(username__iexact=candidate).exclude(
+        pk=getattr(current_user, 'pk', None)
+    ).exists():
+        suffix_text = str(suffix)
+        candidate = f'{base[:150 - len(suffix_text)]}{suffix_text}'
+        suffix += 1
+    return candidate
+
 
 # =============================================================================
 # FORMULARIO: UserRegisterForm (Registro de Pacientes)
@@ -99,7 +125,10 @@ class UserRegisterForm(forms.ModelForm):
         self.fields['last_name'].label = 'Apellidos del Paciente'
         self.fields['email'].label = 'Correo Electrónico'
         self.fields['username'].label = 'Nombre de Usuario'
-        self.fields['username'].help_text = 'Identificador único para entrar al sistema.'
+        self.fields['username'].required = False
+        self.fields['username'].help_text = (
+            'Se sugiere automáticamente con su nombre; puede modificarlo si lo necesita.'
+        )
 
     # --- Validaciones Especiales ---
 
@@ -131,6 +160,15 @@ class UserRegisterForm(forms.ModelForm):
     def clean(self):
         """Verifica que las contraseñas coincidan al registrarse."""
         cleaned_data = super().clean()
+        suggested_username = _suggest_username(
+            cleaned_data.get('first_name', ''),
+            cleaned_data.get('last_name', ''),
+            self.instance,
+        )
+        if not cleaned_data.get('username') or cleaned_data.get('username') == suggested_username:
+            cleaned_data['username'] = suggested_username
+            if not cleaned_data['username']:
+                self.add_error('username', 'Ingrese un nombre y apellido para generar el usuario.')
         password = cleaned_data.get("password")
         password_confirm = cleaned_data.get("password_confirm")
         if password and password_confirm and password != password_confirm:
@@ -155,8 +193,24 @@ class DoctorRegisterForm(forms.ModelForm):
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'password']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].required = False
+        self.fields['username'].help_text = (
+            'Se sugiere automáticamente con el nombre y apellido del doctor.'
+        )
+
     def clean(self):
         cleaned_data = super().clean()
+        suggested_username = _suggest_username(
+            cleaned_data.get('first_name', ''),
+            cleaned_data.get('last_name', ''),
+            self.instance,
+        )
+        if not cleaned_data.get('username') or cleaned_data.get('username') == suggested_username:
+            cleaned_data['username'] = suggested_username
+            if not cleaned_data['username']:
+                self.add_error('username', 'Ingrese un nombre y apellido para generar el usuario.')
         if cleaned_data.get("password") != cleaned_data.get("password_confirm"):
             raise forms.ValidationError("Las contraseñas no coinciden.")
         return cleaned_data

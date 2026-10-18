@@ -36,6 +36,7 @@ urlpatterns = [
     path('ejercicios/monopodal/', views.ejercicio_monopodal, name='ejercicio_monopodal'),
     path('ejercicios/tandem/', views.ejercicio_tandem, name='ejercicio_tandem'),
     path('evaluacion/', views.evaluacion, name='evaluacion'),                  # Pantalla de cámara
+    path('rutina-diaria/', views.rutina_diaria, name='rutina_diaria'),
 
     # --- Seguimiento Clínico y Progreso ---
     path('encuesta-conocimiento/', views.encuesta, name='encuesta'),          # Formulario Sí/No
@@ -51,4 +52,7 @@ urlpatterns = [
 
     # --- API para recepción de datos en tiempo real (Desde camera.js) ---
     path('api/registrar-metricas/', views.registrar_metricas, name='registrar_metricas'),
+    path('api/rutinas/<int:session_id>/repeticiones/', views.registrar_repeticion, name='registrar_repeticion'),
+    path('api/rutinas/<int:session_id>/finalizar/', views.finalizar_rutina, name='finalizar_rutina'),
+    path('api/analizar-pose/', views.analizar_pose, name='analizar_pose'),
 ]

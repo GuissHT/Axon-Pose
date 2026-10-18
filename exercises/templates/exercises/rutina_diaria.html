@@ -1,0 +1,63 @@
+{% extends "exercises/base.html" %}
+{% load static %}
+
+{% block title %}Axon-Pose | Rutina diaria{% endblock %}
+
+{% block content %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+<section class="mb-4">
+    <div class="hero-panel p-4 rounded-4 text-white" style="background: linear-gradient(135deg, #0f766e, #0369a1);">
+        <span class="badge bg-warning text-dark mb-2">Día {{ day_number }} de 15</span>
+        <h1 class="fw-bold mb-2">Rutina diaria de equilibrio</h1>
+        <p class="mb-0">Tres ejercicios, 5 repeticiones de 30 segundos cada uno y descansos de 15 segundos.</p>
+    </div>
+</section>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <article class="video-panel position-relative rounded-4 overflow-hidden" style="background:#0f172a; min-height:500px;">
+            <div class="p-3 position-absolute w-100 z-1 d-flex justify-content-between">
+                <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill">Cámara inactiva</span>
+                <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill">Listo para comenzar</span>
+            </div>
+            <div class="camera-stage position-relative" style="height:500px;background:#000;">
+                <video id="webcam" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;position:absolute;transform:scaleX(-1);"></video>
+                <canvas id="output_canvas" style="width:100%;height:100%;object-fit:contain;position:absolute;z-index:10;"></canvas>
+                <div id="cameraPlaceholder" class="text-white text-center position-absolute top-50 start-50 translate-middle">
+                    <i class="fas fa-camera fa-3x mb-3 text-secondary"></i>
+                    <p>Presiona comenzar para activar la cámara</p>
+                </div>
+            </div>
+        </article>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h2 id="routineState" class="fw-bold text-success">PREPARADO</h2>
+                <p id="exerciseLabel" class="fs-5 mb-1">Equilibrio Estático</p>
+                <div id="routineTimer" class="display-1 fw-bold text-primary">00:30</div>
+                <select id="testTypeSelect" class="form-select visually-hidden" aria-label="Ejercicio actual">
+                    <option value="Equilibrio Estatico">Equilibrio Estático</option>
+                    <option value="Soporte Monopodal">Soporte Monopodal</option>
+                    <option value="Marcha Tandem">Marcha Tándem</option>
+                </select>
+                <div class="d-flex gap-3 my-3">
+                    <div class="flex-fill text-center bg-success-subtle rounded-3 p-2"><small>ÉXITOS</small><div id="successCount" class="fs-3 fw-bold text-success">0</div></div>
+                    <div class="flex-fill text-center bg-danger-subtle rounded-3 p-2"><small>FALLOS</small><div id="failureCount" class="fs-3 fw-bold text-danger">0</div></div>
+                </div>
+                <div class="progress mb-3"><div id="routineProgress" class="progress-bar bg-success" style="width:0%"></div></div>
+                <button id="btnStartEval" class="btn btn-success btn-lg w-100 fw-bold rounded-pill">Comenzar ejercicio</button>
+                <button id="btnStopEval" class="btn btn-outline-secondary w-100 mt-2 rounded-pill" disabled>Detener sesión</button>
+                <div id="sessionSummary" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="{% static 'exercises/js/camera.js' %}"></script>
+<script src="{% static 'exercises/js/rutina.js' %}"></script>
+{% endblock %}

@@ -21,19 +21,30 @@
     const progressBar = document.getElementById('testProgress');
     const metricStability = document.getElementById('metricStability');
     const metricDeviation = document.getElementById('metricDeviation');
+    const metricAngle = document.getElementById('metricAngle');
     const badgeCamera = document.getElementById('badgeCamera');
     const badgeAlignment = document.getElementById('badgeAlignment');
     const testTypeSelect = document.getElementById('testTypeSelect');
+    const isRoutine = document.body.dataset.routine === 'true';
+    const evaluationType = document.body.dataset.evaluationType || 'INICIAL';
 
     const TEST_DURATION_SECONDS = 30;
     let streamRef = null;
     let poseRef = null;
     let animationRef = null;
     let isRunning = false;
+    let workActive = false;
+    let frameInFlight = false;
+    let startInFlight = false;
     let evaluationStartedAt = 0;
     let latestAnalysis = null;
+    let pythonAnalysisInFlight = false;
+    let lastPythonAnalysisAt = 0;
+    let lastAlertAt = 0;
     const analysisWindow = [];
     const MAX_WINDOW = 12;
+    const PYTHON_ANALYSIS_INTERVAL_MS = 500;
+    const ALERT_INTERVAL_MS = 1500;
 
     function getExerciseConfig(testType) {
         const configs = {
@@ -54,13 +65,48 @@
                 trunkTolerance: 0.06,
                 stabilityThreshold: 78,
                 swayWeight: 0.28
+            },
+            'Postura del Arbol': {
+                verticalTolerance: 0.06,
+                trunkTolerance: 0.05,
+                stabilityThreshold: 80,
+                swayWeight: 0.2
             }
         };
 
         return configs[testType] || configs['Marcha Tandem'];
     }
 
+    function playAlert() {
+        const now = performance.now();
+        if (now - lastAlertAt < ALERT_INTERVAL_MS) {
+            return;
+        }
+        lastAlertAt = now;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+            return;
+        }
+        const audioContext = new AudioContextClass();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.frequency.value = 880;
+        oscillator.type = 'sine';
+        gain.gain.value = 0.08;
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.18);
+        oscillator.addEventListener('ended', () => audioContext.close());
+    }
+
     function getCsrfToken() {
+        const tokenElement = document.querySelector('meta[name="csrf-token"]');
+        const templateToken = tokenElement ? tokenElement.getAttribute('content') : '';
+        if (templateToken) {
+            return templateToken;
+        }
+
         const cookies = document.cookie ? document.cookie.split(';') : [];
         for (const cookie of cookies) {
             const trimmed = cookie.trim();
@@ -71,7 +117,16 @@
         return '';
     }
 
+    function setAnalysisStatus(message, isError) {
+        badgeAlignment.textContent = message;
+        badgeAlignment.classList.toggle('warning', Boolean(isError));
+        badgeAlignment.classList.toggle('success', !isError);
+    }
+
     async function guardarSesionEnBackend() {
+        if (isRoutine) {
+            return;
+        }
         if (!latestAnalysis) {
             return;
         }
@@ -81,7 +136,11 @@
             stability: latestAnalysis.estabilidad,
             deviationCm: latestAnalysis.desviacionCm,
             alignment: latestAnalysis.alineacionOptima ? 'Optima' : 'Requiere ajuste',
-            qualityScore: latestAnalysis.qualityScore
+            qualityScore: latestAnalysis.qualityScore,
+            evaluationType: evaluationType,
+            angleDeg: metricAngle
+                ? Number(metricAngle.textContent.replace('°', '')) || 0
+                : 0
         };
 
         try {
@@ -98,6 +157,66 @@
         }
     }
 
+    async function analizarConPython(landmarks) {
+        const now = performance.now();
+        if (pythonAnalysisInFlight || now - lastPythonAnalysisAt < PYTHON_ANALYSIS_INTERVAL_MS) {
+            return;
+        }
+
+        pythonAnalysisInFlight = true;
+        lastPythonAnalysisAt = now;
+        try {
+            const response = await fetch('/api/analizar-pose/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    testType: testTypeSelect ? testTypeSelect.value : 'Marcha Tandem',
+                    landmarks
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.ok) {
+                throw new Error(result.error || 'El analizador no pudo procesar la pose.');
+            }
+
+            latestAnalysis = {
+                estabilidad: Number(result.stability).toFixed(1),
+                desviacionCm: Number(result.deviation_cm).toFixed(2),
+                alineacionOptima: result.alignment === 'Optima',
+                qualityScore: latestAnalysis ? latestAnalysis.qualityScore : '0.0'
+            };
+            videoElement.dispatchEvent(new CustomEvent('axon:pose-analysis', {
+                detail: latestAnalysis
+            }));
+            const angleValues = Object.values(result.angles || {});
+            if (metricAngle) {
+                metricAngle.textContent = angleValues.length
+                    ? `${Number(angleValues[0]).toFixed(1)}°`
+                    : '--';
+            }
+            if (metricStability) {
+                metricStability.textContent = `${latestAnalysis.estabilidad}%`;
+            }
+            if (metricDeviation) {
+                metricDeviation.textContent = `${latestAnalysis.desviacionCm} cm`;
+            }
+            badgeAlignment.textContent = result.message;
+            badgeAlignment.classList.toggle('success', !result.alert);
+            badgeAlignment.classList.toggle('warning', result.alert);
+            if (result.alert) {
+                playAlert();
+            }
+        } catch (error) {
+            setAnalysisStatus(`Error del modelo: ${error.message}`, true);
+            console.warn('No se pudo ejecutar el modelo Python:', error);
+        } finally {
+            pythonAnalysisInFlight = false;
+        }
+    }
+
     function setCameraBadge(active) {
         badgeCamera.textContent = active ? 'Camara activa' : 'Camara inactiva';
         badgeCamera.classList.add('neutral');
@@ -109,13 +228,21 @@
         const remaining = Math.max(TEST_DURATION_SECONDS - Math.floor(elapsedSeconds), 0);
         const remainingText = `00:${String(remaining).padStart(2, '0')}`;
 
-        progressBar.style.width = `${progress.toFixed(1)}%`;
-        timerLabel.textContent = remainingText;
+        if (progressBar) {
+            progressBar.style.width = `${progress.toFixed(1)}%`;
+        }
+        if (timerLabel) {
+            timerLabel.textContent = remainingText;
+        }
     }
 
     function resetProgressUI() {
-        progressBar.style.width = '0%';
-        timerLabel.textContent = '00:30';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+        if (timerLabel) {
+            timerLabel.textContent = '00:30';
+        }
     }
 
     function drawSkeleton(landmarks) {
@@ -214,6 +341,11 @@
         ctx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
         if (results.poseLandmarks) {
+            if (results.poseLandmarks.length < 33) {
+                setAnalysisStatus('No se detectó el cuerpo completo.', true);
+                ctx.restore();
+                return;
+            }
             drawSkeleton(results.poseLandmarks);
             const analisis = analizarEquilibrio(results.poseLandmarks);
             if (!analisis) {
@@ -224,30 +356,63 @@
                 return;
             }
             latestAnalysis = analisis;
+            videoElement.dispatchEvent(new CustomEvent('axon:pose-analysis', {
+                detail: analisis
+            }));
 
-            metricStability.textContent = `${analisis.estabilidad}%`;
-            metricDeviation.textContent = `${analisis.desviacionCm} cm`;
+            if (metricStability) {
+                metricStability.textContent = `${analisis.estabilidad}%`;
+            }
+            if (metricDeviation) {
+                metricDeviation.textContent = `${analisis.desviacionCm} cm`;
+            }
 
             badgeAlignment.textContent = analisis.alineacionOptima ? 'Alineacion optima' : 'Ajustar alineacion';
             badgeAlignment.classList.toggle('success', analisis.alineacionOptima);
             badgeAlignment.classList.toggle('warning', !analisis.alineacionOptima);
+            setAnalysisStatus('Modelo activo: analizando postura', false);
+            if (!isRoutine) {
+                analizarConPython(results.poseLandmarks);
+            }
         }
 
         ctx.restore();
     }
 
     async function processFrameLoop() {
-        if (!isRunning || !poseRef) {
+        if (!isRunning || !workActive || !poseRef || frameInFlight) {
             return;
         }
 
-        await poseRef.send({ image: videoElement });
+        frameInFlight = true;
+        try {
+            await poseRef.send({ image: videoElement });
+        } catch (error) {
+            if (isRunning) {
+                console.warn('No se pudo procesar un fotograma:', error);
+            }
+            return;
+        } finally {
+            frameInFlight = false;
+        }
+
+        if (!isRunning || !workActive) {
+            return;
+        }
 
         const elapsedSeconds = (performance.now() - evaluationStartedAt) / 1000;
         updateProgressUI(elapsedSeconds);
 
         if (elapsedSeconds >= TEST_DURATION_SECONDS) {
-            stopEvaluation();
+            if (isRoutine) {
+                pauseRoutineWork();
+                resetProgressUI();
+                videoElement.dispatchEvent(new CustomEvent('axon:work-complete', {
+                    detail: latestAnalysis
+                }));
+            } else {
+                stopEvaluation();
+            }
             return;
         }
 
@@ -255,7 +420,7 @@
     }
 
     async function startEvaluation() {
-        if (isRunning) {
+        if (isRunning || startInFlight) {
             return;
         }
 
@@ -264,9 +429,14 @@
             return;
         }
 
+        startInFlight = true;
         try {
             streamRef = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720 },
+                video: {
+                    width: { ideal: 640, max: 1280 },
+                    height: { ideal: 480, max: 720 },
+                    facingMode: 'user'
+                },
                 audio: false
             });
 
@@ -281,7 +451,7 @@
             });
 
             poseRef.setOptions({
-                modelComplexity: 1,
+                modelComplexity: 0,
                 smoothLandmarks: true,
                 enableSegmentation: false,
                 minDetectionConfidence: 0.6,
@@ -291,10 +461,14 @@
             poseRef.onResults(onPoseResults);
 
             isRunning = true;
+            workActive = true;
             evaluationStartedAt = performance.now();
             latestAnalysis = null;
             analysisWindow.length = 0;
+            lastPythonAnalysisAt = 0;
+            lastAlertAt = 0;
             setCameraBadge(true);
+            setAnalysisStatus('Buscando cuerpo...', false);
             btnStart.disabled = true;
             btnStop.disabled = false;
 
@@ -302,12 +476,16 @@
         } catch (error) {
             console.error('Error al iniciar evaluacion:', error);
             alert('No fue posible acceder a la camara. Verifique permisos del navegador.');
+            videoElement.dispatchEvent(new CustomEvent('axon:start-failed'));
             stopEvaluation();
+        } finally {
+            startInFlight = false;
         }
     }
 
     async function stopEvaluation() {
         isRunning = false;
+        workActive = false;
 
         if (animationRef) {
             window.cancelAnimationFrame(animationRef);
@@ -319,6 +497,16 @@
             streamRef = null;
         }
 
+        if (poseRef && typeof poseRef.close === 'function') {
+            try {
+                await poseRef.close();
+            } catch (error) {
+                console.warn('No se pudo cerrar el modelo de pose:', error);
+            } finally {
+                poseRef = null;
+            }
+        }
+
         if (videoElement.srcObject) {
             videoElement.srcObject = null;
         }
@@ -327,13 +515,51 @@
         badgeAlignment.textContent = 'Alineacion en espera';
         badgeAlignment.classList.remove('warning');
         badgeAlignment.classList.add('success');
-        btnStart.disabled = false;
+        if (!isRoutine) {
+            btnStart.disabled = false;
+        }
         btnStop.disabled = true;
         resetProgressUI();
 
-        await guardarSesionEnBackend();
+        if (!isRoutine) {
+            await guardarSesionEnBackend();
+        }
     }
 
-    btnStart.addEventListener('click', startEvaluation);
+    function pauseRoutineWork() {
+        if (!isRunning) {
+            return;
+        }
+        workActive = false;
+        if (animationRef) {
+            window.cancelAnimationFrame(animationRef);
+            animationRef = null;
+        }
+    }
+
+    function resumeRoutineWork() {
+        if (!isRunning || workActive) {
+            return;
+        }
+        workActive = true;
+        evaluationStartedAt = performance.now();
+        latestAnalysis = null;
+        analysisWindow.length = 0;
+        lastPythonAnalysisAt = 0;
+        setAnalysisStatus('Buscando cuerpo...', false);
+        processFrameLoop();
+    }
+
+    videoElement.addEventListener('axon:pause-work', pauseRoutineWork);
+    videoElement.addEventListener('axon:resume-work', resumeRoutineWork);
+    videoElement.addEventListener('axon:end-routine', stopEvaluation);
+    videoElement.addEventListener('axon:start-failed', () => {
+        isRunning = false;
+        workActive = false;
+    });
+    videoElement.addEventListener('axon:start-work', startEvaluation);
+    if (!isRoutine) {
+        btnStart.addEventListener('click', startEvaluation);
+    }
     btnStop.addEventListener('click', stopEvaluation);
 })();
