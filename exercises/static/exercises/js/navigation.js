@@ -1,27 +1,29 @@
 (function initAxonPoseNavigation() {
+    const layout = document.querySelector('.app-layout');
     const sidebar = document.getElementById('main-navigation');
     const toggle = document.querySelector('.mobile-menu-toggle');
-    if (!sidebar || !toggle) {
+    if (!layout || !sidebar || !toggle) {
         return;
     }
 
-    const closeMenu = () => {
-        sidebar.classList.remove('is-open');
-        toggle.setAttribute('aria-expanded', 'false');
+    const setCollapsed = (collapsed) => {
+        layout.classList.toggle('is-sidebar-collapsed', collapsed);
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+        toggle.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú');
     };
 
-    toggle.addEventListener('click', () => {
-        const isOpen = sidebar.classList.toggle('is-open');
-        toggle.setAttribute('aria-expanded', String(isOpen));
-    });
+    setCollapsed(window.localStorage.getItem('axon-sidebar-collapsed') === 'true');
 
-    sidebar.querySelectorAll('a').forEach((link) => {
-        link.addEventListener('click', closeMenu);
+    toggle.addEventListener('click', () => {
+        const collapsed = !layout.classList.contains('is-sidebar-collapsed');
+        setCollapsed(collapsed);
+        window.localStorage.setItem('axon-sidebar-collapsed', String(collapsed));
     });
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            closeMenu();
+            setCollapsed(true);
+            window.localStorage.setItem('axon-sidebar-collapsed', 'true');
         }
     });
 })();

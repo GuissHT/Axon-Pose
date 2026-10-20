@@ -19,16 +19,19 @@
     const ctx = canvasElement.getContext('2d');
     const timerLabel = document.getElementById('timerLabel');
     const progressBar = document.getElementById('testProgress');
+    const phaseIndicator = document.getElementById('phaseIndicator');
+    const phaseNotice = document.getElementById('phaseNotice');
     const metricStability = document.getElementById('metricStability');
     const metricDeviation = document.getElementById('metricDeviation');
     const metricAngle = document.getElementById('metricAngle');
     const badgeCamera = document.getElementById('badgeCamera');
     const badgeAlignment = document.getElementById('badgeAlignment');
-    const testTypeSelect = document.getElementById('testTypeSelect');
+    const testType = 'Equilibrio Estatico';
     const isRoutine = document.body.dataset.routine === 'true';
     const evaluationType = document.body.dataset.evaluationType || 'INICIAL';
 
     const TEST_DURATION_SECONDS = 30;
+    const TOTAL_PHASES = 2;
     let streamRef = null;
     let poseRef = null;
     let animationRef = null;
@@ -37,6 +40,7 @@
     let frameInFlight = false;
     let startInFlight = false;
     let evaluationStartedAt = 0;
+    let currentPhase = 1;
     let latestAnalysis = null;
     let pythonAnalysisInFlight = false;
     let lastPythonAnalysisAt = 0;
@@ -132,7 +136,7 @@
         }
 
         const payload = {
-            testType: testTypeSelect ? testTypeSelect.value : 'Diagnostico general',
+            testType,
             stability: latestAnalysis.estabilidad,
             deviationCm: latestAnalysis.desviacionCm,
             alignment: latestAnalysis.alineacionOptima ? 'Optima' : 'Requiere ajuste',
@@ -173,7 +177,7 @@
                     'X-CSRFToken': getCsrfToken()
                 },
                 body: JSON.stringify({
-                    testType: testTypeSelect ? testTypeSelect.value : 'Marcha Tandem',
+                    testType,
                     landmarks
                 })
             });
@@ -236,6 +240,21 @@
         }
     }
 
+    function updatePhaseUI() {
+        const phaseName = currentPhase === 1 ? 'Ojos Abiertos' : 'Ojos Cerrados';
+        if (phaseIndicator) {
+            phaseIndicator.textContent = `Fase ${currentPhase} de ${TOTAL_PHASES}: ${phaseName}`;
+        }
+    }
+
+    function showPhaseNotice(message) {
+        if (!phaseNotice) {
+            return;
+        }
+        phaseNotice.textContent = message;
+        phaseNotice.classList.remove('d-none');
+    }
+
     function resetProgressUI() {
         if (progressBar) {
             progressBar.style.width = '0%';
@@ -243,6 +262,12 @@
         if (timerLabel) {
             timerLabel.textContent = '00:30';
         }
+        updatePhaseUI();
+        if (phaseNotice) {
+            phaseNotice.textContent = '';
+            phaseNotice.classList.add('d-none');
+        }
+        btnStart.innerHTML = '<i class="fas fa-play me-2"></i> Comenzar evaluación';
     }
 
     function drawSkeleton(landmarks) {
@@ -301,7 +326,6 @@
         const centerAnkleX = (leftAnkle.x + rightAnkle.x) / 2;
         const ankleDistance = Math.abs(leftAnkle.x - rightAnkle.x);
 
-        const testType = testTypeSelect ? testTypeSelect.value : 'Marcha Tandem';
         const cfg = getExerciseConfig(testType);
 
         const verticalError = Math.abs(centerShoulderX - centerAnkleX);
@@ -410,6 +434,8 @@
                 videoElement.dispatchEvent(new CustomEvent('axon:work-complete', {
                     detail: latestAnalysis
                 }));
+            } else if (currentPhase === 1) {
+                completeOpenEyesPhase();
             } else {
                 stopEvaluation();
             }
@@ -419,8 +445,42 @@
         animationRef = window.requestAnimationFrame(processFrameLoop);
     }
 
+    function completeOpenEyesPhase() {
+        workActive = false;
+        if (animationRef) {
+            window.cancelAnimationFrame(animationRef);
+            animationRef = null;
+        }
+        currentPhase = 2;
+        updatePhaseUI();
+        updateProgressUI(0);
+        showPhaseNotice('Fase 1 completada. Prepárese para cerrar los ojos.');
+        btnStart.disabled = false;
+        btnStart.innerHTML = '<i class="fas fa-play me-2"></i> Iniciar fase 2';
+        setAnalysisStatus('Listo para iniciar ojos cerrados.', false);
+    }
+
+    function startClosedEyesPhase() {
+        currentPhase = 2;
+        workActive = true;
+        evaluationStartedAt = performance.now();
+        latestAnalysis = null;
+        analysisWindow.length = 0;
+        lastPythonAnalysisAt = 0;
+        updatePhaseUI();
+        if (phaseNotice) {
+            phaseNotice.textContent = 'Fase 2 iniciada. Mantenga los ojos cerrados durante 30 segundos.';
+        }
+        setAnalysisStatus('Buscando cuerpo...', false);
+        btnStart.disabled = true;
+        processFrameLoop();
+    }
+
     async function startEvaluation() {
         if (isRunning || startInFlight) {
+            if (!isRoutine && isRunning && currentPhase === 2 && !workActive) {
+                startClosedEyesPhase();
+            }
             return;
         }
 
@@ -462,6 +522,7 @@
 
             isRunning = true;
             workActive = true;
+            currentPhase = 1;
             evaluationStartedAt = performance.now();
             latestAnalysis = null;
             analysisWindow.length = 0;
@@ -471,6 +532,11 @@
             setAnalysisStatus('Buscando cuerpo...', false);
             btnStart.disabled = true;
             btnStop.disabled = false;
+            updatePhaseUI();
+            if (phaseNotice) {
+                phaseNotice.textContent = 'Fase 1 iniciada. Mantenga los ojos abiertos durante 30 segundos.';
+                phaseNotice.classList.remove('d-none');
+            }
 
             processFrameLoop();
         } catch (error) {
@@ -519,6 +585,7 @@
             btnStart.disabled = false;
         }
         btnStop.disabled = true;
+        currentPhase = 1;
         resetProgressUI();
 
         if (!isRoutine) {

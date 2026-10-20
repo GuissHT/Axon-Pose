@@ -45,10 +45,8 @@ urlpatterns = [
     path('doctor/progreso-pacientes/', views.progreso_pacientes, name='progreso_pacientes'), # Lista seguimiento
 
     # --- Contacto, Citas y Reportes PDF ---
-    path('mi-doctor/', views.mi_doctor, name='mi_doctor'),                    # Página de contacto
     path('agendar-cita/', views.agendar_cita, name='agendar_cita'),           # Sistema de citas
     path('reportes/descargar-pdf/', views.descargar_reporte_pdf, name='descargar_reporte_pdf'),
-    path('reportes/enviar-doctor/', views.enviar_reporte_doctor, name='enviar_reporte_doctor'),
 
     # --- API para recepción de datos en tiempo real (Desde camera.js) ---
     path('api/registrar-metricas/', views.registrar_metricas, name='registrar_metricas'),

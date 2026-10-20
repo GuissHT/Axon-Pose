@@ -66,10 +66,12 @@ svg {
 
 .user-name {
     font-size: 0.95rem;
+    font-weight: 700;
 }
 
 .user-role {
     font-size: 0.8rem;
+    font-weight: 400;
 }
 
 .avatar {
@@ -223,10 +225,67 @@ body {
 }
 
 .app-header {
-    position: relative;
-    top: -0.25rem;
-    min-height: 34px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    min-height: 36px;
     margin-bottom: 0.25rem;
+    overflow: visible;
+}
+
+.user-menu {
+    margin-left: auto;
+    order: 2;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    border: 1px solid rgba(15, 59, 93, 0.16);
+    border-radius: 14px;
+    background: transparent;
+}
+
+.user-menu-trigger {
+    max-width: 100%;
+}
+
+.user-menu-trigger > .text-end {
+    min-width: 0;
+}
+
+.app-layout .user-menu .user-role {
+    font-size: 0.8rem !important;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.mobile-menu-toggle {
+    order: 1;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    color: #0f1722;
+    background: transparent;
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.mobile-menu-toggle:hover,
+.mobile-menu-toggle:focus-visible {
+    color: #1f5d88;
+    background: rgba(15, 23, 34, 0.08);
+}
+
+.mobile-menu-toggle:focus-visible {
+    outline: 3px solid rgba(14, 165, 233, 0.35);
+    outline-offset: 2px;
 }
 
 .top-header {
@@ -805,11 +864,8 @@ body {
 @media (max-width: 768px) {
     .mobile-menu-toggle {
         display: inline-flex;
-        position: fixed;
-        top: 12px;
-        left: 12px;
+        position: relative;
         z-index: 1045;
-        align-items: center;
     }
 
     .sidebar {
@@ -844,11 +900,11 @@ body {
     }
 
     .main-content {
-        padding-top: 4.5rem !important;
+        padding-top: 1rem !important;
     }
 
     .patient-interface .main-content {
-        padding-top: 4.5rem !important;
+        padding-top: 1rem !important;
     }
 }
 
@@ -925,11 +981,8 @@ body {
 
     .mobile-menu-toggle {
         display: inline-flex;
-        position: fixed;
-        top: 10px;
-        left: 10px;
+        position: relative;
         z-index: 1045;
-        align-items: center;
     }
 
     .main-content,
@@ -937,13 +990,13 @@ body {
         width: 100%;
         max-width: 100%;
         min-width: 0;
-        padding: 3.75rem 1rem 1rem !important;
+        padding: 1rem !important;
         margin-left: 0;
     }
 
     .app-header {
-        min-height: 34px;
-        margin-bottom: 0.5rem;
+        min-height: 40px;
+        margin-bottom: 0.25rem;
     }
 
     .patient-interface .card-body {
@@ -959,6 +1012,23 @@ body {
 }
 
 @media (max-width: 576px) {
+    .app-header {
+        gap: 0.5rem;
+        min-height: 48px;
+    }
+
+    .mobile-menu-toggle {
+        width: 40px;
+        height: 40px;
+    }
+
+    .user-menu-trigger > .text-end {
+        max-width: min(45vw, 150px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .main-content,
     .patient-interface .main-content {
         padding-right: 0.75rem !important;
@@ -966,11 +1036,11 @@ body {
     }
 
     .user-name {
-        font-size: 0.85rem;
+        font-size: 0.95rem;
     }
 
     .user-role {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
     }
 
     .patient-interface {
@@ -1057,6 +1127,245 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Rail lateral colapsable: conserva la navegación visible sin cubrir el contenido. */
+.app-layout {
+    --sidebar-expanded-width: clamp(240px, 20vw, 300px);
+    --sidebar-collapsed-width: 76px;
+}
+
+.app-layout .sidebar {
+    width: var(--sidebar-expanded-width);
+    flex-basis: var(--sidebar-expanded-width);
+    z-index: 1100;
+    transition: width 0.25s ease, flex-basis 0.25s ease, padding 0.25s ease;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.app-layout .sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+.app-layout .main-content {
+    margin-left: var(--sidebar-expanded-width);
+    transition: margin-left 0.25s ease;
+}
+
+.app-layout .main-content,
+.app-layout .patient-interface .main-content {
+    padding-top: 1rem !important;
+}
+
+.app-layout .mobile-menu-toggle {
+    display: inline-flex;
+    position: relative;
+    z-index: 1045;
+    margin-left: auto;
+    color: #d8e3f2;
+    background: transparent;
+}
+
+.app-layout .mobile-menu-toggle:hover,
+.app-layout .mobile-menu-toggle:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.app-layout .sidebar-brand {
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.app-layout .sidebar-brand .mobile-menu-toggle {
+    order: 2;
+    margin-left: auto;
+}
+
+.app-layout .sidebar-brand-title {
+    min-width: 0;
+}
+
+.app-layout .nav-link {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.app-layout .nav-link .nav-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-layout .nav-link[data-tooltip] {
+    position: relative;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar {
+    width: var(--sidebar-collapsed-width);
+    flex-basis: var(--sidebar-collapsed-width);
+    padding-right: 10px;
+    padding-left: 10px;
+    overflow: visible;
+}
+
+.app-layout.is-sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand {
+    gap: 0;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand .mobile-menu-toggle {
+    order: -1;
+    margin-left: 0;
+    margin-bottom: 8px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-logo-slot {
+    width: 40px;
+    height: 40px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand-title {
+    display: none;
+}
+
+.app-layout.is-sidebar-collapsed .mobile-menu-toggle {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar .nav-link {
+    justify-content: center;
+    padding-right: 8px;
+    padding-left: 8px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar .nav-link .me-2 {
+    margin-right: 0 !important;
+}
+
+.app-layout.is-sidebar-collapsed .nav-label {
+    display: none;
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 12px);
+    z-index: 1201;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: #ffffff;
+    background: #111827;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(4px, -50%);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:hover::after,
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:hover,
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:focus-visible {
+    z-index: 1200;
+}
+
+@media (max-width: 1200px) {
+    .app-layout {
+        --sidebar-expanded-width: 230px;
+    }
+}
+
+@media (max-width: 992px) {
+    .app-layout {
+        --sidebar-expanded-width: min(84vw, 300px);
+        display: block;
+    }
+
+    .app-layout .sidebar,
+    .app-layout .patient-interface .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: var(--sidebar-expanded-width);
+        height: 100vh;
+        min-height: 100vh;
+        transform: none;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .app-layout .main-content,
+    .app-layout .patient-interface .main-content {
+        width: 100%;
+        max-width: 100%;
+        margin-left: var(--sidebar-expanded-width);
+        padding: 1rem !important;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar,
+    .app-layout.is-sidebar-collapsed .patient-interface .sidebar {
+        width: var(--sidebar-collapsed-width);
+        overflow: visible;
+    }
+
+    .app-layout.is-sidebar-collapsed .main-content,
+    .app-layout.is-sidebar-collapsed .patient-interface .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+}
+
+@media (max-width: 576px) {
+    .app-layout {
+        --sidebar-collapsed-width: 64px;
+    }
+
+    .app-layout .sidebar {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .app-layout .sidebar-logo-slot {
+        width: 44px;
+        height: 44px;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar-logo-slot {
+        width: 34px;
+        height: 34px;
+    }
+
+    .app-layout .sidebar-brand {
+        gap: 8px;
+    }
 }
 
 .image-slot .image-placeholder.is-hidden {

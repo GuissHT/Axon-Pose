@@ -26,6 +26,15 @@ class Profile(models.Model):
 
     # Vinculación con la cuenta principal de Django
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+
+    # Doctores responsables del seguimiento del paciente.
+    assigned_doctors = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='assigned_patient_profiles',
+        limit_choices_to={'profile__role': 'doctor'},
+        verbose_name='Doctores asignados',
+    )
     
     # Datos básicos de identificación y rol
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient')
@@ -236,6 +245,17 @@ class Appointment(models.Model):
     date = models.DateTimeField(verbose_name="Fecha y Hora")
     reason = models.CharField(max_length=200, verbose_name="Motivo")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas del Doctor")
+    STATUS_CHOICES = (
+        ('PENDIENTE', 'Pendiente'),
+        ('COMPLETADA', 'Completada'),
+        ('CANCELADA', 'Cancelada'),
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=STATUS_CHOICES,
+        default='PENDIENTE',
+        verbose_name='Estado',
+    )
     is_completed = models.BooleanField(default=False, verbose_name="¿Cita concluida?")
     created_at = models.DateTimeField(auto_now_add=True)
 

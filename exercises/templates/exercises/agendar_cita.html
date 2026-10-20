@@ -15,6 +15,26 @@
 </div>
 
 <div class="row g-4">
+    {% if not is_doctor and next_appointment %}
+    <div class="col-12">
+        <div class="alert alert-info border-info rounded-4 shadow-sm mb-0" role="status">
+            <div class="d-flex align-items-start gap-3">
+                <i class="fas fa-calendar-check fs-4 mt-1"></i>
+                <div>
+                    <strong>Tienes una cita de revisión programada</strong>
+                    <div>
+                        Con el Dr.
+                        {{ next_appointment.doctor.get_full_name|default:next_appointment.doctor.username }}
+                        el {{ next_appointment.date|date:"d/m/Y" }}
+                        a las {{ next_appointment.date|date:"H:i" }}.
+                    </div>
+                    <small>Motivo: {{ next_appointment.reason }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if is_doctor %}
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9);">
@@ -28,31 +48,53 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="create">
 
+                    {% if appointment_form.non_field_errors %}
+                        <div class="alert alert-danger py-2 small" role="alert">
+                            {{ appointment_form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" for="doctorSelect">Seleccionar Especialista</label>
-                        <select id="doctorSelect" name="doctor_id" class="form-select" required>
-                            <option value="" selected disabled>Elija un doctor...</option>
-                            {% for doctor in doctors %}
-                                <option value="{{ doctor.id }}">{{ doctor.name }} ({{ doctor.specialty }})</option>
+                        <label class="form-label fw-semibold" for="patientSelect">Seleccionar paciente</label>
+                        <select id="patientSelect" name="patient" class="form-select{% if appointment_form.patient.errors %} is-invalid{% endif %}" required>
+                            <option value="" disabled {% if not appointment_form.patient.value %}selected{% endif %}>Elija un paciente...</option>
+                            {% for patient in patients %}
+                                <option value="{{ patient.user.id }}" {% if appointment_form.patient.value|stringformat:"s" == patient.user.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ patient.user.get_full_name|default:patient.user.username }}
+                                </option>
+                            {% empty %}
+                                <option value="" disabled>No tienes pacientes asignados</option>
                             {% endfor %}
                         </select>
+                        {% for error in appointment_form.patient.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-sm-6">
                             <label class="form-label fw-semibold" for="fechaInput">Fecha</label>
-                            <input id="fechaInput" type="date" name="fecha" class="form-control" required>
+                            <input id="fechaInput" type="date" name="fecha" min="{{ today }}" value="{{ appointment_form.fecha.value|default:'' }}" class="form-control{% if appointment_form.fecha.errors %} is-invalid{% endif %}" required>
+                            {% for error in appointment_form.fecha.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label fw-semibold" for="horaInput">Hora</label>
-                            <input id="horaInput" type="time" name="hora" class="form-control" min="08:00" max="18:00" required>
-                            <div class="form-text small">Atención: 08:00 - 18:00</div>
+                            <input id="horaInput" type="time" name="hora" value="{{ appointment_form.hora.value|default:'' }}" class="form-control{% if appointment_form.hora.errors %} is-invalid{% endif %}" min="08:00" max="17:59" required>
+                            <div class="form-text small">Atención: 08:00 - 17:59</div>
+                            {% for error in appointment_form.hora.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
                         </div>
                     </div>
 
                     <div class="mb-4">
                         <label class="form-label fw-semibold" for="motivoInput">Motivo de la consulta</label>
-                        <textarea id="motivoInput" name="motivo" rows="3" class="form-control" placeholder="Describa brevemente el motivo..." required></textarea>
+                        <textarea id="motivoInput" name="motivo" rows="3" class="form-control{% if appointment_form.motivo.errors %} is-invalid{% endif %}" placeholder="Describa brevemente el motivo..." required>{{ appointment_form.motivo.value|default:'' }}</textarea>
+                        {% for error in appointment_form.motivo.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
                     </div>
 
                     <button type="submit" class="btn btn-primary w-100 fw-bold rounded-pill shadow-sm">
@@ -104,8 +146,10 @@
                                         <div class="small text-truncate" style="max-width: 150px;">{{ cita.reason }}</div>
                                     </td>
                                     <td class="text-center">
-                                        {% if cita.is_completed %}
+                                        {% if cita.status == 'COMPLETADA' or cita.is_completed %}
                                             <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">Finalizada</span>
+                                        {% elif cita.status == 'CANCELADA' %}
+                                            <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle">Cancelada</span>
                                         {% else %}
                                             <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle">Programada</span>
                                         {% endif %}

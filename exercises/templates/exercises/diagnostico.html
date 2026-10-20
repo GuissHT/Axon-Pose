@@ -4,33 +4,40 @@
 {% block title %}Axon-Pose | Diagnóstico{% endblock %}
 
 {% block content %}
+{% if not is_doctor %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-<section class="diagnostic-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; min-height: 75vh;">
+<section class="diagnostic-layout diagnostic-layout--romberg">
     <article class="info-panel" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
         <span class="badge bg-primary mb-2 align-self-start px-3 py-2 rounded-pill"><i class="fas fa-stethoscope me-1"></i> Evaluación {{ evaluation_type|title }}</span>
-        <h1 class="fw-bold mb-3">Evaluación inicial de equilibrio</h1>
+        <h1 class="fw-bold mb-3">Evaluación de Romberg</h1>
         <p class="text-secondary" style="font-size: 1.1rem;">Siga las instrucciones y mantenga la posición por 30 segundos para obtener estabilidad y desviación lateral en tiempo real.</p>
 
         <div class="card border-0 bg-light rounded-4 mb-3" style="border-left: 4px solid #1f5d88 !important;">
             <div class="card-body">
                 <h5 class="fw-bold text-dark"><i class="fas fa-info-circle me-2 text-primary"></i> Instrucción principal</h5>
-                <p class="mb-0">Mantenga la postura indicada, con mirada al frente y hombros alineados frente a la cámara.</p>
+                <ul class="mb-0 ps-3">
+                    <li>Ubíquese de pie frente a la cámara.</li>
+                    <li>Mantenga los pies juntos y la postura recta.</li>
+                    <li>Coloque las manos pegadas a los lados del cuerpo o extendidas hacia adelante.</li>
+                    <li>Mantenga la mirada fija al frente durante los 30 segundos.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="alert alert-warning border-warning rounded-4 mb-3 d-flex align-items-start gap-2" role="alert">
+            <span class="fs-5" aria-hidden="true">⚠️</span>
+            <div>
+                <strong>Recomendación de seguridad:</strong>
+                Realice esta evaluación con supervisión médica.
             </div>
         </div>
 
         <div class="mt-auto">
-            <label for="testTypeSelect" class="form-label fw-bold text-dark mb-2">Tipo de prueba actual:</label>
-            <select id="testTypeSelect" class="form-select form-select-lg shadow-sm border-0 mb-4" style="background-color: #f8fafc;">
-                <option value="Equilibrio Estatico" {% if selected_exercise == 'Equilibrio Estatico' %}selected{% endif %}>Equilibrio Estático</option>
-                <option value="Soporte Monopodal" {% if selected_exercise == 'Soporte Monopodal' %}selected{% endif %}>Soporte Monopodal</option>
-                <option value="Marcha Tandem" {% if selected_exercise == 'Marcha Tandem' %}selected{% endif %}>Marcha Tándem</option>
-                <option value="Postura del Arbol" {% if selected_exercise == 'Postura del Arbol' %}selected{% endif %}>Postura del Árbol</option>
-            </select>
-
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold text-secondary">Progreso del test (30s)</span>
+            <div class="d-flex justify-content-between align-items-center mb-2 phase-header">
+                <span class="fw-bold text-primary" id="phaseIndicator">Fase 1 de 2: Ojos Abiertos</span>
                 <span id="timerLabel" class="fw-bold text-primary fs-4">00:30</span>
             </div>
+            <div id="phaseNotice" class="alert alert-info py-2 px-3 rounded-3 mb-3 d-none" role="status"></div>
             <div class="progress mb-4 rounded-pill" style="height: 12px; background-color: #e2e8f0;">
                 <div id="testProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill" style="width: 0%"></div>
             </div>
@@ -46,8 +53,8 @@
         </div>
     </article>
 
-    <article class="video-panel position-relative" style="background: #0f172a; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); min-height: 400px; display: flex; flex-direction: column;">
-        <div class="d-flex justify-content-between p-3 position-absolute w-100 z-1">
+    <article class="video-panel position-relative video-panel--romberg" style="background: #0f172a; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); min-height: 400px; display: flex; flex-direction: column;">
+        <div class="d-flex justify-content-between p-3 position-absolute w-100 z-1 camera-status">
             <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill shadow"><i class="fas fa-video-slash me-1"></i> Cámara inactiva</span>
             <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill shadow"><i class="fas fa-ruler-combined me-1"></i> Alineación en espera</span>
         </div>
@@ -77,13 +84,14 @@
         </div>
     </article>
 </section>
+{% endif %}
 
 {% if is_doctor %}
-<div class="card border-0 shadow-sm rounded-4 mt-4" style="background: rgba(255, 255, 255, 0.9);">
+<div class="card border-0 shadow-sm rounded-4 mt-0 doctor-results-card" style="background: rgba(255, 255, 255, 0.9); min-height: 75vh;">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-4 text-dark"><i class="fas fa-users-viewfinder text-primary me-2"></i> Estado de pacientes y evaluación previa</h5>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
+        <h5 class="fw-bold mb-4 text-dark results-title"><i class="fas fa-users-viewfinder text-primary me-2"></i> Estado de pacientes y evaluación previa</h5>
+        <div class="table-responsive results-table-wrapper">
+            <table class="table table-hover align-middle results-table">
                 <thead class="table-light">
                     <tr>
                         <th class="border-0 rounded-start">Paciente</th>
@@ -97,13 +105,13 @@
                 <tbody>
                     {% for patient in patient_list %}
                     <tr>
-                        <td>
+                        <td data-label="Paciente">
                             <div class="fw-bold text-dark">{{ patient.full_name }}</div>
                         </td>
-                        <td>
+                        <td data-label="Última prueba">
                             <span class="text-secondary">{{ patient.last_test }}</span>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-label="Estabilidad (%)">
                             {% if patient.last_stability != 'N/A' %}
                                 <div class="fw-bold {% if patient.last_stability|add:0 >= 80 %}text-success{% elif patient.last_stability|add:0 >= 60 %}text-warning{% else %}text-danger{% endif %}">
                                     {{ patient.last_stability }}%
@@ -112,13 +120,13 @@
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-label="Desviación (cm)">
                             <span class="fw-semibold">{{ patient.last_deviation }}{% if patient.last_deviation != 'N/A' %} cm{% endif %}</span>
                         </td>
-                        <td class="text-center text-muted small">
+                        <td class="text-center text-muted small" data-label="Fecha">
                             {{ patient.last_date }}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-label="Estado">
                             {% if patient.last_test == 'Ninguna' %}
                                 <span class="badge rounded-pill bg-light text-secondary border">Sin registrar</span>
                             {% else %}
@@ -140,18 +148,246 @@
 
 <style>
     .bg-primary-subtle { background-color: #e0f2fe !important; }
+    .diagnostic-layout--romberg {
+        width: 100%;
+        max-width: 100%;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: clamp(1rem, 3vw, 2rem);
+        min-height: 75vh;
+    }
+    .diagnostic-layout--romberg > *,
+    .doctor-results-card {
+        min-width: 0;
+        max-width: 100%;
+    }
+    .diagnostic-layout--romberg .info-panel {
+        overflow: visible;
+    }
+    .diagnostic-layout--romberg h1,
+    .diagnostic-layout--romberg p,
+    .diagnostic-layout--romberg li,
+    .doctor-results-card td,
+    .doctor-results-card th {
+        overflow-wrap: anywhere;
+    }
+    .doctor-results-card {
+        min-height: min(75vh, 760px) !important;
+    }
+    .doctor-results-card .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .doctor-results-card table {
+        min-width: 700px;
+    }
+    .results-title {
+        overflow-wrap: anywhere;
+    }
+    .video-panel--romberg {
+        min-height: clamp(360px, 58vw, 640px) !important;
+    }
     @media (max-width: 991px) {
-        .diagnostic-layout {
-            grid-template-columns: 1fr !important;
+        .diagnostic-layout--romberg {
+            grid-template-columns: minmax(0, 1fr);
+            min-height: auto;
         }
-        .video-panel {
-            height: 500px;
+        .info-panel {
+            min-height: auto;
+        }
+        .video-panel--romberg {
+            min-height: clamp(360px, 75vw, 520px) !important;
+        }
+        .doctor-results-card {
+            min-height: auto !important;
+        }
+        .doctor-results-card .card-body {
+            padding: clamp(1rem, 3vw, 1.5rem) !important;
+        }
+        .diagnostic-layout--romberg .info-panel,
+        .diagnostic-layout--romberg .video-panel--romberg {
+            width: 100%;
+        }
+    }
+    @media (min-width: 1200px) {
+        .diagnostic-layout--romberg {
+            gap: clamp(1.5rem, 2.5vw, 2.5rem);
+        }
+        .diagnostic-layout--romberg .info-panel {
+            padding: clamp(1.5rem, 2.2vw, 2.5rem) !important;
+        }
+        .doctor-results-card .card-body {
+            padding: clamp(1.5rem, 2.5vw, 2.5rem) !important;
+        }
+    }
+    @media (min-width: 577px) and (max-width: 1199px) {
+        .diagnostic-layout--romberg h1 {
+            font-size: clamp(1.6rem, 3.2vw, 2.25rem);
+        }
+        .diagnostic-layout--romberg .info-panel {
+            padding: clamp(1.25rem, 2.5vw, 2rem) !important;
+        }
+        .doctor-results-card .card-body {
+            padding: clamp(1.25rem, 2.5vw, 2rem) !important;
+        }
+    }
+    @media (max-width: 576px) {
+        .doctor-results-card {
+            border-radius: 14px !important;
+        }
+        .doctor-results-card .card-body {
+            padding: 1rem !important;
+        }
+        .results-title {
+            font-size: 1rem;
+            line-height: 1.35;
+        }
+        .results-table-wrapper {
+            overflow: visible !important;
+        }
+        .results-table {
+            min-width: 0 !important;
+            display: block;
+            margin-bottom: 0;
+        }
+        .results-table thead {
+            display: none;
+        }
+        .results-table tbody,
+        .results-table tr,
+        .results-table td {
+            display: block;
+            width: 100%;
+        }
+        .results-table tr {
+            padding: 0.8rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+        .results-table td {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.45rem 0;
+            border: 0;
+            text-align: right !important;
+            overflow-wrap: anywhere;
+        }
+        .results-table td::before {
+            flex: 0 0 44%;
+            color: #64748b;
+            content: attr(data-label);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: left;
+            text-transform: uppercase;
+        }
+        .results-table td:first-child {
+            padding-top: 0;
+        }
+        .results-table td:last-child {
+            padding-bottom: 0;
+        }
+        .results-table td[colspan] {
+            display: block;
+            text-align: center !important;
+        }
+        .results-table td[colspan]::before {
+            display: none;
+        }
+        .diagnostic-layout--romberg .info-panel {
+            padding: 1.25rem !important;
+        }
+        .diagnostic-layout--romberg h1 {
+            font-size: clamp(1.5rem, 8vw, 2rem);
+        }
+        .diagnostic-layout--romberg .phase-header {
+            align-items: flex-start !important;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .diagnostic-layout--romberg .phase-header #timerLabel {
+            font-size: 1.5rem !important;
+        }
+        .diagnostic-layout--romberg .d-grid.d-sm-flex .btn {
+            width: 100%;
+        }
+        .camera-status {
+            align-items: flex-start !important;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .metrics-overlay {
+            flex-wrap: wrap;
+        }
+        .metric-box {
+            min-width: calc(50% - 0.25rem);
+        }
+        .metric-box:last-child {
+            min-width: 100%;
+        }
+        .diagnostic-layout--romberg .card-body,
+        .diagnostic-layout--romberg .alert {
+            max-width: 100%;
+        }
+        .diagnostic-layout--romberg {
+            gap: 1rem;
+        }
+        .diagnostic-layout--romberg .info-panel {
+            border-radius: 14px !important;
+        }
+        .diagnostic-layout--romberg .info-panel p,
+        .diagnostic-layout--romberg .info-panel li {
+            font-size: 0.95rem !important;
+            line-height: 1.45;
+        }
+        .diagnostic-layout--romberg .alert {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .video-panel--romberg {
+            min-height: min(112vw, 460px) !important;
+            border-radius: 14px !important;
+            padding: 0.75rem !important;
+        }
+        .video-panel--romberg .camera-stage {
+            min-height: min(100vw, 400px);
+        }
+        .video-panel--romberg .badge {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .doctor-results-card table {
+            font-size: 0.9rem;
+        }
+    }
+    @media (max-width: 380px) {
+        .diagnostic-layout--romberg .info-panel {
+            padding: 1rem !important;
+        }
+        .diagnostic-layout--romberg h1 {
+            font-size: 1.45rem;
+        }
+        .diagnostic-layout--romberg .phase-header #phaseIndicator {
+            font-size: 0.9rem;
+        }
+        .video-panel--romberg {
+            min-height: 360px !important;
+        }
+        .video-panel--romberg .camera-stage {
+            min-height: 300px;
         }
     }
 </style>
 {% endblock %}
 
 {% block extra_js %}
+{% if not is_doctor %}
 <!-- Librerias CDN de MediaPipe Pose para analisis en frontend. -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -163,4 +399,5 @@
         if(placeholder) placeholder.style.display = 'none';
     });
 </script>
+{% endif %}
 {% endblock %}

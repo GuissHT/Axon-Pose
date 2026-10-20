@@ -11,7 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'exercises/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'exercises/css/style.css' %}?v=2026102001">
     {% block extra_css %}{% endblock %}
 </head>
 <!-- La clase se limita al rol paciente para no modificar las vistas clínicas o administrativas. -->
@@ -25,44 +25,41 @@
                 </div>
                 <div class="sidebar-brand-title">
                     <h2>AXON-POSE</h2>
-                    <small>Telerehabilitación asistida</small>
                 </div>
+                <button class="mobile-menu-toggle" type="button" aria-label="Contraer menú" aria-controls="main-navigation" aria-expanded="true">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
             </div>
             
             <nav class="nav flex-column gap-2 mt-3" aria-label="Menú de usuario">
-                <a class="nav-link {% if request.resolver_match.url_name == 'inicio' or request.resolver_match.url_name == 'doctor_dashboard' %}active{% endif %}" href="{% if user.is_authenticated %}{% if user.is_staff or user.profile.role == 'doctor' %}{% url 'doctor_dashboard' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'inicio' %}{% endif %}"><i class="fas fa-home me-2"></i> Inicio</a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'inicio' or request.resolver_match.url_name == 'doctor_dashboard' %}active{% endif %}" data-tooltip="Inicio" aria-label="Inicio" href="{% if user.is_authenticated %}{% if user.is_staff or user.profile.role == 'doctor' %}{% url 'doctor_dashboard' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'inicio' %}{% endif %}"><i class="fas fa-home me-2"></i><span class="nav-label">Inicio</span></a>
                 {% if user.is_authenticated %}
                     {% if user.is_staff or user.profile.role == 'doctor' %}
-                        <a class="nav-link {% if request.resolver_match.url_name == 'registrar_paciente' %}active{% endif %}" href="{% url 'registrar_paciente' %}"><i class="fas fa-user-plus me-2"></i> Registro de Pacientes</a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'registrar_paciente' %}active{% endif %}" data-tooltip="Registro de Pacientes" aria-label="Registro de Pacientes" href="{% url 'registrar_paciente' %}"><i class="fas fa-user-plus me-2"></i><span class="nav-label">Registro de Pacientes</span></a>
                         {% if user.is_staff %}
-                            <a class="nav-link {% if request.resolver_match.url_name == 'registrar_doctor' %}active{% endif %}" href="{% url 'registrar_doctor' %}"><i class="fas fa-user-md me-2"></i> Gestión de Doctores</a>
+                            <a class="nav-link {% if request.resolver_match.url_name == 'registrar_doctor' %}active{% endif %}" data-tooltip="Gestión de Doctores" aria-label="Gestión de Doctores" href="{% url 'registrar_doctor' %}"><i class="fas fa-user-md me-2"></i><span class="nav-label">Gestión de Doctores</span></a>
                         {% endif %}
-                        <a class="nav-link {% if request.resolver_match.url_name == 'progreso_pacientes' or request.resolver_match.url_name == 'progreso_paciente' %}active{% endif %}" href="{% url 'progreso_pacientes' %}"><i class="fas fa-chart-line me-2"></i> Evaluaciones</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'gestionar_preguntas' %}active{% endif %}" href="{% url 'gestionar_preguntas' %}"><i class="fas fa-clipboard-check me-2"></i> Gestión de Encuestas</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'evaluacion' %}active{% endif %}" href="{% url 'evaluacion' %}"><i class="fas fa-video me-2"></i> Revisión de Ejercicios</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'agendar_cita' %}active{% endif %}" href="{% url 'agendar_cita' %}"><i class="fas fa-calendar-alt me-2"></i> Agenda</a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'progreso_pacientes' or request.resolver_match.url_name == 'progreso_paciente' %}active{% endif %}" data-tooltip="Evaluaciones" aria-label="Evaluaciones" href="{% url 'progreso_pacientes' %}"><i class="fas fa-chart-line me-2"></i><span class="nav-label">Evaluaciones</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'gestionar_preguntas' %}active{% endif %}" data-tooltip="Gestión de Encuestas" aria-label="Gestión de Encuestas" href="{% url 'gestionar_preguntas' %}"><i class="fas fa-clipboard-check me-2"></i><span class="nav-label">Gestión de Encuestas</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'evaluacion' %}active{% endif %}" data-tooltip="Revisión de Ejercicios" aria-label="Revisión de Ejercicios" href="{% url 'evaluacion' %}"><i class="fas fa-video me-2"></i><span class="nav-label">Revisión de Ejercicios</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'agendar_cita' %}active{% endif %}" data-tooltip="Agenda" aria-label="Agenda" href="{% url 'agendar_cita' %}"><i class="fas fa-calendar-alt me-2"></i><span class="nav-label">Agenda</span></a>
                     {% else %}
-                        <a class="nav-link {% if request.resolver_match.url_name == 'evaluacion' %}active{% endif %}" href="{% url 'evaluacion' %}"><i class="fas fa-camera me-2"></i> Evaluación</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'encuesta' %}active{% endif %}" href="{% url 'encuesta' %}"><i class="fas fa-clipboard-list me-2"></i> Encuesta de Salud</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'ejercicios' %}active{% endif %}" href="{% url 'ejercicios' %}"><i class="fas fa-running me-2"></i> Mis Ejercicios</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'progreso' %}active{% endif %}" href="{% url 'progreso' %}"><i class="fas fa-chart-line me-2"></i> Mi Progreso</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'agendar_cita' %}active{% endif %}" href="{% url 'agendar_cita' %}"><i class="fas fa-calendar-alt me-2"></i> Citas</a>
-                        <a class="nav-link {% if request.resolver_match.url_name == 'mi_doctor' %}active{% endif %}" href="{% url 'mi_doctor' %}"><i class="fas fa-file-medical me-2"></i> Reportes</a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'evaluacion' %}active{% endif %}" data-tooltip="Evaluación" aria-label="Evaluación" href="{% url 'evaluacion' %}"><i class="fas fa-camera me-2"></i><span class="nav-label">Evaluación</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'encuesta' %}active{% endif %}" data-tooltip="Encuesta de Salud" aria-label="Encuesta de Salud" href="{% url 'encuesta' %}"><i class="fas fa-clipboard-list me-2"></i><span class="nav-label">Encuesta de Salud</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'ejercicios' %}active{% endif %}" data-tooltip="Mis Ejercicios" aria-label="Mis Ejercicios" href="{% url 'ejercicios' %}"><i class="fas fa-running me-2"></i><span class="nav-label">Mis Ejercicios</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'progreso' %}active{% endif %}" data-tooltip="Mi Progreso" aria-label="Mi Progreso" href="{% url 'progreso' %}"><i class="fas fa-chart-line me-2"></i><span class="nav-label">Mi Progreso</span></a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'agendar_cita' %}active{% endif %}" data-tooltip="Citas" aria-label="Citas" href="{% url 'agendar_cita' %}"><i class="fas fa-calendar-alt me-2"></i><span class="nav-label">Citas</span></a>
                     {% endif %}
                 {% else %}
-                    <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'login' %}"><i class="fas fa-sign-in-alt me-2"></i> Iniciar sesión</a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" data-tooltip="Iniciar sesión" aria-label="Iniciar sesión" href="{% url 'login' %}"><i class="fas fa-sign-in-alt me-2"></i><span class="nav-label">Iniciar sesión</span></a>
                 {% endif %}
             </nav>
         </aside>
 
-        <button class="mobile-menu-toggle btn btn-primary shadow-sm" type="button" aria-controls="main-navigation" aria-expanded="false">
-            <i class="fas fa-bars me-2" aria-hidden="true"></i> Menú
-        </button>
-
         <main class="main-content p-3 p-md-4" id="main-content">
-            <header class="app-header d-flex justify-content-end align-items-center me-md-2">
+            <header class="app-header d-flex align-items-center me-md-2">
                 {% if user.is_authenticated %}
-                    <div class="dropdown">
+                    <div class="dropdown user-menu">
                         <button type="button" class="user-menu-trigger d-flex align-items-center text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
                             <div class="text-end me-3">
                                 <div class="user-name fw-bold text-dark">{{ user.get_full_name|default:user.username }}</div>

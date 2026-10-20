@@ -8,12 +8,18 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
-from django.core.mail import EmailMessage
 from django.db import transaction
 from django.http import FileResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from .forms import UserRegisterForm, DoctorRegisterForm, QuestionForm, DoctorAdviceForm
+from .forms import (
+    AppointmentForm,
+    UserRegisterForm,
+    DoctorRegisterForm,
+    QuestionForm,
+    DoctorAdviceForm,
+)
 from .models import (
     Profile, ExerciseSession, Evaluation, DailySession, SessionExerciseDetail,
     ExerciseRepetition, Question, PatientAnswer, DoctorAdvice, Appointment,
@@ -75,7 +81,11 @@ def _quality_semaphore(score: float) -> str:
     return 'Baja'
 
 
-def _build_report_pdf(report_data: dict | None = None, observations: str = '') -> BytesIO:
+def _build_report_pdf(
+    report_data: dict | None = None,
+    observations: str = '',
+    patient=None,
+) -> BytesIO:
     """
     Genera un archivo PDF profesional con el reporte clínico consolidado.
     Utiliza la libreria ReportLab para dibujar texto y datos en un canvas A4.
@@ -97,8 +107,45 @@ def _build_report_pdf(report_data: dict | None = None, observations: str = '') -
     pdf.setFont('Helvetica', 10)
     pdf.drawString(margin_x, y, f'Fecha de emisión: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
 
-    # --- SECCIÓN: DIAGNÓSTICO ACTUAL ---
+    # --- SECCIÓN: DATOS DEL PACIENTE ---
     y -= 28
+    pdf.setFont('Helvetica-Bold', 12)
+    pdf.drawString(margin_x, y, 'Datos del paciente')
+
+    y -= 20
+    pdf.setFont('Helvetica', 10)
+    patient_lines = []
+    if patient is not None:
+        try:
+            profile = patient.profile
+        except Profile.DoesNotExist:
+            profile = None
+
+        patient_lines = [
+            f"Nombre completo: {patient.get_full_name() or patient.username}",
+            f"Edad: {(profile.age if profile else None) or 'No registrada'}",
+            f"Teléfono: {(profile.phone if profile else None) or 'No registrado'}",
+            f"Correo: {patient.email or 'No registrado'}",
+        ]
+        if profile is not None:
+            doctors = profile.assigned_doctors.all()
+            doctor_names = ', '.join(
+                doctor.get_full_name() or doctor.username
+                for doctor in doctors
+            )
+            patient_lines.append(
+                f"Doctor asignado: {doctor_names or 'No asignado'}"
+            )
+    else:
+        patient_lines = ['No se encontraron datos del paciente.']
+
+    for line in patient_lines:
+        for line_part in (line[i:i + 95] for i in range(0, len(line), 95)):
+            pdf.drawString(margin_x, y, line_part)
+            y -= 15
+
+    # --- SECCIÓN: DIAGNÓSTICO ACTUAL ---
+    y -= 13
     pdf.setFont('Helvetica-Bold', 12)
     pdf.drawString(margin_x, y, 'Resumen de diagnóstico')
 
@@ -200,6 +247,8 @@ def registrar_paciente(request):
                 emergency_contact_address=form.cleaned_data.get('emergency_contact_address', ''),
                 emergency_contact_email=form.cleaned_data.get('emergency_contact_email', ''),
             )
+            if hasattr(request.user, 'profile') and request.user.profile.role == 'doctor':
+                user.profile.assigned_doctors.add(request.user)
             messages.success(request, 'Paciente registrado correctamente.')
             return redirect('registrar_paciente')
     else:
@@ -387,6 +436,8 @@ def editar_paciente(request, patient_id):
             profile.emergency_contact_address = form.cleaned_data.get('emergency_contact_address')
             profile.emergency_contact_email = form.cleaned_data.get('emergency_contact_email')
             profile.save()
+            if hasattr(request.user, 'profile') and request.user.profile.role == 'doctor':
+                profile.assigned_doctors.add(request.user)
             messages.success(request, 'Datos del paciente actualizados.')
             return redirect('registrar_paciente')
     else:
@@ -448,19 +499,12 @@ def ejercicio_tandem(request):
 @login_required
 def evaluacion(request):
     """
-    La vista más importante: Abre la cámara e inicia el motor de visión artificial.
-    Si el usuario es doctor, le permite seleccionar un paciente para la prueba.
+    Muestra la evaluación para pacientes y el resumen de resultados para doctores.
     """
-    exercise = request.GET.get('exercise', 'Marcha Tandem')
-    allowed_exercises = {
-        'Equilibrio Estatico',
-        'Soporte Monopodal',
-        'Marcha Tandem',
-    }
-    selected_exercise = exercise if exercise in allowed_exercises else 'Marcha Tandem'
-    
+    selected_exercise = 'Equilibrio Estatico'
+    is_doctor = _is_doctor(request.user)
     patient_data = []
-    if _is_doctor(request.user):
+    if is_doctor:
         patients = Profile.objects.filter(role='patient').select_related('user')
         for p in patients:
             last_session = ExerciseSession.objects.filter(patient=p.user).order_by('-created_at').first()
@@ -479,7 +523,7 @@ def evaluacion(request):
         'selected_exercise': selected_exercise,
         'evaluation_type': evaluation_type,
         'patient_list': patient_data,
-        'is_doctor': _is_doctor(request.user)
+        'is_doctor': is_doctor,
     }
     return render(request, 'exercises/diagnostico.html', context)
 
@@ -724,47 +768,39 @@ def descargar_reporte_pdf(request):
 
     eval_history = get_eval_history(target_user)
     report_data = {'latest_eval': eval_history[-1] if eval_history else {}, 'history': eval_history}
-    pdf_buffer = _build_report_pdf(report_data, observations=request.GET.get('obs', ''))
+    pdf_buffer = _build_report_pdf(
+        report_data,
+        observations=request.GET.get('obs', ''),
+        patient=target_user,
+    )
     
     return FileResponse(pdf_buffer, as_attachment=True, filename=f'reporte_{target_user.username}.pdf')
 
 
 @login_required
-def enviar_reporte_doctor(request):
-    """Envía el PDF del reporte por correo electrónico al doctor."""
-    if request.method != 'POST': return redirect('mi_doctor')
-
-    doctor_email = request.POST.get('doctor_email', '').strip().lower()
-    doctor_match = User.objects.filter(email=doctor_email, profile__role='doctor').first()
-
-    if not doctor_match:
-        messages.error(request, 'Doctor no encontrado.')
-        return redirect('mi_doctor')
-
-    eval_history = get_eval_history(request.user)
-    report_data = {'latest_eval': eval_history[-1] if eval_history else {}, 'history': eval_history}
-    pdf_buffer = _build_report_pdf(report_data, observations=request.POST.get('observaciones', ''))
-    
-    email = EmailMessage(
-        subject=f'Reporte Axon-Pose: {request.user.username}',
-        body='Se adjunta el reporte clínico de Axon-Pose.',
-        to=[doctor_email],
-    )
-    email.attach('reporte_clinico.pdf', pdf_buffer.getvalue(), 'application/pdf')
-    email.send(fail_silently=True)
-    messages.success(request, 'Reporte enviado.')
-    return redirect('mi_doctor')
-
-
-@login_required
 def agendar_cita(request):
-    """Muestra la agenda; los pacientes solo pueden consultar sus citas."""
-    doctors = _get_available_doctors()
+    """Sincroniza la agenda de citas entre el doctor y sus pacientes."""
     is_doctor = _is_doctor(request.user)
     if is_doctor:
-        appointments = Appointment.objects.filter(doctor=request.user).order_by('date')
+        assigned_patients = Profile.objects.filter(
+            role='patient',
+        ).select_related('user').order_by('user__first_name', 'user__last_name')
+        appointments = Appointment.objects.filter(
+            doctor=request.user,
+        ).select_related('patient', 'patient__profile').order_by('date')
     else:
-        appointments = Appointment.objects.filter(patient=request.user).order_by('date')
+        assigned_patients = Profile.objects.none()
+        appointments = Appointment.objects.filter(
+            patient=request.user,
+        ).select_related('doctor', 'doctor__profile').order_by('date')
+
+    appointment_form = None
+    if is_doctor:
+        appointment_form = AppointmentForm(
+            patient_queryset=User.objects.filter(
+                profile__role='patient',
+            ).order_by('first_name', 'last_name', 'username'),
+        )
 
     if request.method == 'POST':
         if not is_doctor:
@@ -773,34 +809,52 @@ def agendar_cita(request):
 
         action = request.POST.get('action')
         if action == 'cancel':
-            Appointment.objects.filter(id=request.POST.get('cita_id')).delete()
-            messages.success(request, 'Cita cancelada.')
+            cancelled_count = Appointment.objects.filter(
+                id=request.POST.get('cita_id'),
+                doctor=request.user,
+            ).update(status='CANCELADA')
+            if cancelled_count:
+                messages.success(request, 'Cita cancelada.')
+            else:
+                messages.error(request, 'La cita no existe o no te pertenece.')
+            return redirect('agendar_cita')
         else:
-            try:
-                dt_cita = datetime.strptime(f"{request.POST.get('fecha')} {request.POST.get('hora')}", '%Y-%m-%d %H:%M')
-                if 8 <= dt_cita.hour < 18:
-                    Appointment.objects.create(
-                        doctor=User.objects.get(id=request.POST.get('doctor_id')),
-                        patient=request.user, date=dt_cita, reason=request.POST.get('motivo')
-                    )
-                    messages.success(request, 'Cita agendada.')
-                else:
-                    messages.error(request, 'Horario no permitido (08-18h).')
-            except Exception as e:
-                messages.error(request, f'Error: {str(e)}')
-        return redirect('agendar_cita')
+            appointment_form = AppointmentForm(
+                request.POST,
+                patient_queryset=User.objects.filter(
+                    profile__role='patient',
+                ).order_by('first_name', 'last_name', 'username'),
+            )
+            if appointment_form.is_valid():
+                fecha = appointment_form.cleaned_data['fecha']
+                hora = appointment_form.cleaned_data['hora']
+                dt_cita = timezone.make_aware(
+                    datetime.combine(fecha, hora),
+                    timezone.get_current_timezone(),
+                )
+                Appointment.objects.create(
+                    doctor=request.user,
+                    patient=appointment_form.cleaned_data['patient'],
+                    date=dt_cita,
+                    reason=appointment_form.cleaned_data['motivo'].strip(),
+                    status='PENDIENTE',
+                )
+                messages.success(request, 'Cita agendada.')
+                return redirect('agendar_cita')
+
+    next_appointment = appointments.filter(
+        date__gte=timezone.now(),
+        status='PENDIENTE',
+    ).first() if not is_doctor else None
 
     return render(request, 'exercises/agendar_cita.html', {
-        'doctors': doctors,
+        'patients': assigned_patients,
         'appointments': appointments,
+        'next_appointment': next_appointment,
         'is_doctor': is_doctor,
+        'appointment_form': appointment_form,
+        'today': timezone.localdate().isoformat(),
     })
-
-
-@login_required
-def mi_doctor(request):
-    """Vista informativa sobre el doctor asignado y descarga de reportes."""
-    return render(request, 'exercises/mi_doctor.html', {'doctors': _get_available_doctors()})
 
 
 # =============================================================================

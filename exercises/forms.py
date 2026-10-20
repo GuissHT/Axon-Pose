@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.utils import timezone
 import re
 import unicodedata
 from .models import Profile, Question, DoctorAdvice
@@ -26,6 +27,89 @@ def _suggest_username(first_name, last_name, current_user=None):
         candidate = f'{base[:150 - len(suffix_text)]}{suffix_text}'
         suffix += 1
     return candidate
+
+
+class AppointmentForm(forms.Form):
+    """Valida y normaliza los datos de una cita creada por un doctor."""
+
+    patient = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label='Seleccionar paciente',
+        empty_label='Elija un paciente...',
+        error_messages={
+            'required': 'Seleccione un paciente.',
+            'invalid_choice': 'El paciente seleccionado no existe o no está disponible.',
+        },
+    )
+    fecha = forms.DateField(
+        label='Fecha',
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        error_messages={
+            'required': 'Seleccione la fecha de la cita.',
+            'invalid': 'Introduzca una fecha válida.',
+        },
+    )
+    hora = forms.TimeField(
+        label='Hora',
+        input_formats=['%H:%M'],
+        widget=forms.TimeInput(
+            attrs={'type': 'time', 'min': '08:00', 'max': '17:59'},
+        ),
+        error_messages={
+            'required': 'Seleccione la hora de la cita.',
+            'invalid': 'Introduzca una hora válida.',
+        },
+    )
+    motivo = forms.CharField(
+        label='Motivo de la consulta',
+        max_length=200,
+        widget=forms.Textarea(
+            attrs={
+                'rows': 3,
+                'placeholder': 'Describa brevemente el motivo...',
+            },
+        ),
+        error_messages={'required': 'Indique el motivo de la consulta.'},
+    )
+
+    def __init__(self, *args, patient_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['patient'].queryset = (
+            patient_queryset
+            if patient_queryset is not None
+            else User.objects.filter(profile__role='patient').order_by(
+                'first_name', 'last_name', 'username'
+            )
+        )
+
+    def clean_fecha(self):
+        fecha = self.cleaned_data['fecha']
+        if fecha < timezone.localdate():
+            raise forms.ValidationError(
+                'No se pueden agendar citas en fechas pasadas. '
+                'Seleccione una fecha válida.'
+            )
+        return fecha
+
+    def clean_hora(self):
+        hora = self.cleaned_data['hora']
+        if not 8 <= hora.hour < 18:
+            raise forms.ValidationError('Horario no permitido. Elija una hora entre 08:00 y 17:59.')
+        return hora
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get('fecha')
+        hora = cleaned_data.get('hora')
+        if fecha == timezone.localdate() and hora:
+            ahora = timezone.localtime().time()
+            if hora <= ahora:
+                self.add_error(
+                    'hora',
+                    'La hora seleccionada ya pasó. Elija una hora futura.',
+                )
+        return cleaned_data
 
 
 # =============================================================================
