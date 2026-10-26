@@ -1,6 +1,116 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.utils import timezone
+import re
+import unicodedata
 from .models import Profile, Question, DoctorAdvice
+
+
+def _suggest_username(first_name, last_name, current_user=None):
+    """Genera un usuario legible y único a partir del nombre completo."""
+    normalized_name = unicodedata.normalize('NFKD', f'{first_name} {last_name}')
+    normalized_name = normalized_name.encode('ascii', 'ignore').decode('ascii')
+    name_parts = re.findall(r'[a-z0-9]+', normalized_name.lower())
+    if not name_parts:
+        return ''
+
+    base = name_parts[0]
+    if len(name_parts) > 1:
+        base += name_parts[1][0]
+
+    candidate = base[:150]
+    suffix = 2
+    while User.objects.filter(username__iexact=candidate).exclude(
+        pk=getattr(current_user, 'pk', None)
+    ).exists():
+        suffix_text = str(suffix)
+        candidate = f'{base[:150 - len(suffix_text)]}{suffix_text}'
+        suffix += 1
+    return candidate
+
+
+class AppointmentForm(forms.Form):
+    """Valida y normaliza los datos de una cita creada por un doctor."""
+
+    patient = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label='Seleccionar paciente',
+        empty_label='Elija un paciente...',
+        error_messages={
+            'required': 'Seleccione un paciente.',
+            'invalid_choice': 'El paciente seleccionado no existe o no está disponible.',
+        },
+    )
+    fecha = forms.DateField(
+        label='Fecha',
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        error_messages={
+            'required': 'Seleccione la fecha de la cita.',
+            'invalid': 'Introduzca una fecha válida.',
+        },
+    )
+    hora = forms.TimeField(
+        label='Hora',
+        input_formats=['%H:%M'],
+        widget=forms.TimeInput(
+            attrs={'type': 'time', 'min': '08:00', 'max': '17:59'},
+        ),
+        error_messages={
+            'required': 'Seleccione la hora de la cita.',
+            'invalid': 'Introduzca una hora válida.',
+        },
+    )
+    motivo = forms.CharField(
+        label='Motivo de la consulta',
+        max_length=200,
+        widget=forms.Textarea(
+            attrs={
+                'rows': 3,
+                'placeholder': 'Describa brevemente el motivo...',
+            },
+        ),
+        error_messages={'required': 'Indique el motivo de la consulta.'},
+    )
+
+    def __init__(self, *args, patient_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['patient'].queryset = (
+            patient_queryset
+            if patient_queryset is not None
+            else User.objects.filter(profile__role='patient').order_by(
+                'first_name', 'last_name', 'username'
+            )
+        )
+
+    def clean_fecha(self):
+        fecha = self.cleaned_data['fecha']
+        if fecha < timezone.localdate():
+            raise forms.ValidationError(
+                'No se pueden agendar citas en fechas pasadas. '
+                'Seleccione una fecha válida.'
+            )
+        return fecha
+
+    def clean_hora(self):
+        hora = self.cleaned_data['hora']
+        if not 8 <= hora.hour < 18:
+            raise forms.ValidationError('Horario no permitido. Elija una hora entre 08:00 y 17:59.')
+        return hora
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha = cleaned_data.get('fecha')
+        hora = cleaned_data.get('hora')
+        if fecha == timezone.localdate() and hora:
+            ahora = timezone.localtime().time()
+            if hora <= ahora:
+                self.add_error(
+                    'hora',
+                    'La hora seleccionada ya pasó. Elija una hora futura.',
+                )
+        return cleaned_data
+
 
 # =============================================================================
 # FORMULARIO: UserRegisterForm (Registro de Pacientes)
@@ -99,7 +209,10 @@ class UserRegisterForm(forms.ModelForm):
         self.fields['last_name'].label = 'Apellidos del Paciente'
         self.fields['email'].label = 'Correo Electrónico'
         self.fields['username'].label = 'Nombre de Usuario'
-        self.fields['username'].help_text = 'Identificador único para entrar al sistema.'
+        self.fields['username'].required = False
+        self.fields['username'].help_text = (
+            'Se sugiere automáticamente con su nombre; puede modificarlo si lo necesita.'
+        )
 
     # --- Validaciones Especiales ---
 
@@ -131,6 +244,15 @@ class UserRegisterForm(forms.ModelForm):
     def clean(self):
         """Verifica que las contraseñas coincidan al registrarse."""
         cleaned_data = super().clean()
+        suggested_username = _suggest_username(
+            cleaned_data.get('first_name', ''),
+            cleaned_data.get('last_name', ''),
+            self.instance,
+        )
+        if not cleaned_data.get('username') or cleaned_data.get('username') == suggested_username:
+            cleaned_data['username'] = suggested_username
+            if not cleaned_data['username']:
+                self.add_error('username', 'Ingrese un nombre y apellido para generar el usuario.')
         password = cleaned_data.get("password")
         password_confirm = cleaned_data.get("password_confirm")
         if password and password_confirm and password != password_confirm:
@@ -155,8 +277,24 @@ class DoctorRegisterForm(forms.ModelForm):
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'password']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].required = False
+        self.fields['username'].help_text = (
+            'Se sugiere automáticamente con el nombre y apellido del doctor.'
+        )
+
     def clean(self):
         cleaned_data = super().clean()
+        suggested_username = _suggest_username(
+            cleaned_data.get('first_name', ''),
+            cleaned_data.get('last_name', ''),
+            self.instance,
+        )
+        if not cleaned_data.get('username') or cleaned_data.get('username') == suggested_username:
+            cleaned_data['username'] = suggested_username
+            if not cleaned_data['username']:
+                self.add_error('username', 'Ingrese un nombre y apellido para generar el usuario.')
         if cleaned_data.get("password") != cleaned_data.get("password_confirm"):
             raise forms.ValidationError("Las contraseñas no coinciden.")
         return cleaned_data

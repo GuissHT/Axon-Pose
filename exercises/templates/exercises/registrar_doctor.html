@@ -52,6 +52,7 @@
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold text-secondary">{{ form.username.label }}</label>
                         {{ form.username }}
+                        <div class="form-text text-muted small">Ejemplo: Ana Hunwres → anah. Si ya existe, se agregará un número.</div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold text-secondary">{{ form.password.label }}</label>
@@ -130,6 +131,26 @@
                 input.classList.add("form-control", "rounded-3");
             }
         });
+    });
+</script>
+<script>
+    // Sugiere el usuario mientras se escriben los nombres, sin impedir editarlo manualmente.
+    document.addEventListener('DOMContentLoaded', function () {
+        const firstName = document.querySelector('#id_first_name');
+        const lastName = document.querySelector('#id_last_name');
+        const username = document.querySelector('#id_username');
+        if (!firstName || !lastName || !username || username.value) return;
+
+        let generatedValue = '';
+        const updateUsername = function () {
+            if (username.value && username.value !== generatedValue) return;
+            const first = firstName.value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/)[0];
+            const last = lastName.value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/)[0];
+            generatedValue = (first + (last ? last.charAt(0) : '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+            username.value = generatedValue;
+        };
+        firstName.addEventListener('input', updateUsername);
+        lastName.addEventListener('input', updateUsername);
     });
 </script>
 {% endblock %}

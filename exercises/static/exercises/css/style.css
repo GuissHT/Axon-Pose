@@ -18,6 +18,82 @@
     box-sizing: border-box;
 }
 
+html,
+body {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+    max-width: 100%;
+}
+
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+}
+
+.skip-link {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1100;
+    padding: 10px 16px;
+    color: #ffffff;
+    background: #0f1722;
+    transform: translateY(-120%);
+    transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+.mobile-menu-toggle {
+    display: none;
+}
+
+.user-menu-trigger {
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.user-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.user-role {
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.toast-container {
+    z-index: 1055;
+}
+
+.toast {
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.toast-body {
+    font-size: 1rem;
+}
+
 body {
     margin: 0;
     min-height: 100vh;
@@ -43,10 +119,12 @@ body {
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
     height: 100vh;
     overflow-y: auto;
+    overflow-x: hidden;
     transition: width 0.25s ease, flex-basis 0.25s ease, padding 0.25s ease;
     box-shadow: 10px 0 28px rgba(7, 11, 18, 0.18);
 }
@@ -138,10 +216,76 @@ body {
 .main-content {
     flex: 1;
     min-width: 0;
+    margin-left: clamp(240px, 20vw, 300px);
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    padding-top: 0 !important;
     padding-bottom: 0 !important;
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    min-height: 36px;
+    margin-bottom: 0.25rem;
+    overflow: visible;
+}
+
+.user-menu {
+    margin-left: auto;
+    order: 2;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    border: 1px solid rgba(15, 59, 93, 0.16);
+    border-radius: 14px;
+    background: transparent;
+}
+
+.user-menu-trigger {
+    max-width: 100%;
+}
+
+.user-menu-trigger > .text-end {
+    min-width: 0;
+}
+
+.app-layout .user-menu .user-role {
+    font-size: 0.8rem !important;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.mobile-menu-toggle {
+    order: 1;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    color: #0f1722;
+    background: transparent;
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.mobile-menu-toggle:hover,
+.mobile-menu-toggle:focus-visible {
+    color: #1f5d88;
+    background: rgba(15, 23, 34, 0.08);
+}
+
+.mobile-menu-toggle:focus-visible {
+    outline: 3px solid rgba(14, 165, 233, 0.35);
+    outline-offset: 2px;
 }
 
 .top-header {
@@ -283,6 +427,250 @@ body {
     color: #62738e;
 }
 
+/*
+   Modo de lectura a distancia para pacientes adultos mayores.
+   Todas las reglas usan .patient-interface para mantener el tamaño estándar
+   de las vistas de doctores y administración. Los colores sólidos y los
+   tamaños mínimos siguen una jerarquía de 24 px para texto y 48 px para títulos.
+*/
+.patient-interface {
+    --patient-text: #172033;
+    --patient-muted: #334155;
+    --patient-primary: #075985;
+    --patient-surface: #ffffff;
+    font-family: 'Open Sans', 'Manrope', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.55;
+    color: var(--patient-text);
+    background: #eef4f8;
+}
+
+.patient-interface .sidebar {
+    flex-basis: clamp(300px, 23vw, 360px);
+    width: clamp(300px, 23vw, 360px);
+    padding: 32px 24px;
+}
+
+.patient-interface .sidebar-brand-title h2 {
+    font-size: 2rem;
+}
+
+.patient-interface .sidebar-brand-title small,
+.patient-interface .sidebar-caption {
+    color: #e2e8f0;
+    font-size: 1.25rem;
+}
+
+.patient-interface .sidebar .nav {
+    gap: 0.75rem !important;
+}
+
+.patient-interface .sidebar .nav-link {
+    color: #f1f5f9;
+    min-height: 64px;
+    padding: 14px 16px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.patient-interface .main-content {
+    padding: 2rem !important;
+    margin-left: clamp(300px, 23vw, 360px);
+}
+
+.patient-interface .hero-panel {
+    background: #123b5d !important;
+    color: #ffffff !important;
+    padding: 2rem !important;
+}
+
+.patient-interface .hero-panel h1,
+.patient-interface .info-panel h1 {
+    font-size: clamp(3rem, 4vw, 3.5rem);
+    line-height: 1.15;
+}
+
+.patient-interface .hero-panel p,
+.patient-interface .hero-panel .opacity-90 {
+    color: #ffffff !important;
+    font-size: 1.5rem !important;
+    opacity: 1 !important;
+}
+
+.patient-interface h2 {
+    font-size: 2.5rem;
+}
+
+.patient-interface h5 {
+    font-size: 2rem;
+}
+
+.patient-interface h6 {
+    font-size: 1.5rem;
+}
+
+.patient-interface p,
+.patient-interface li,
+.patient-interface label,
+.patient-interface th,
+.patient-interface td,
+.patient-interface .form-text {
+    font-size: 1.5rem;
+}
+
+.patient-interface .small,
+.patient-interface small,
+.patient-interface .text-muted,
+.patient-interface .text-secondary {
+    color: var(--patient-muted) !important;
+    font-size: 1.25rem !important;
+}
+
+.patient-interface .card,
+.patient-interface .info-panel {
+    background: var(--patient-surface) !important;
+}
+
+.patient-interface .card-body {
+    padding: 2rem !important;
+}
+
+.patient-interface .btn,
+.patient-interface .form-select,
+.patient-interface .form-control {
+    min-height: 64px;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.patient-interface .btn {
+    padding: 0.75rem 1.5rem;
+}
+
+.patient-interface .btn-primary,
+.patient-interface .btn-outline-primary:hover {
+    background-color: var(--patient-primary) !important;
+    border-color: var(--patient-primary) !important;
+    color: #ffffff !important;
+}
+
+.patient-interface .btn-outline-primary {
+    border-color: var(--patient-primary) !important;
+    color: var(--patient-primary) !important;
+}
+
+.patient-interface .btn-warning {
+    background-color: #fbbf24 !important;
+    border-color: #fbbf24 !important;
+    color: #172033 !important;
+}
+
+.patient-interface .form-control,
+.patient-interface .form-select {
+    border: 2px solid #475569;
+    color: var(--patient-text);
+}
+
+.patient-interface .form-control::placeholder {
+    color: #475569;
+    opacity: 1;
+}
+
+.patient-interface .table {
+    --bs-table-color: var(--patient-text);
+}
+
+.patient-interface .badge {
+    font-size: 1.25rem;
+    font-weight: 700;
+    padding: 0.6rem 1rem;
+}
+
+.patient-interface .custom-radio .form-check-input {
+    width: 2rem;
+    height: 2rem;
+}
+
+.patient-interface .custom-radio .form-check-label {
+    padding-top: 0;
+}
+
+.patient-interface .video-panel {
+    min-height: 560px;
+}
+
+.patient-interface .metric-box small {
+    color: #ffffff !important;
+    font-size: 1.15rem !important;
+}
+
+.patient-interface .metric-box div {
+    font-size: 2rem !important;
+}
+
+/* En pantallas estrechas se conserva el tamaño accesible sin forzar desplazamiento horizontal. */
+@media (max-width: 1100px) {
+    .patient-interface .sidebar {
+        flex-basis: 270px;
+        width: 270px;
+    }
+
+    .patient-interface .sidebar .nav-link {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .patient-interface {
+        font-size: 1.375rem;
+    }
+
+    .patient-interface .sidebar {
+        position: static;
+        width: 100%;
+        min-height: auto;
+    }
+
+    .patient-interface .app-layout {
+        display: block;
+    }
+
+    .patient-interface .main-content {
+        padding: 1rem !important;
+    }
+
+    .patient-interface .hero-panel h1,
+    .patient-interface .info-panel h1 {
+        font-size: 2.5rem;
+    }
+
+    .patient-interface .hero-panel p,
+    .patient-interface p,
+    .patient-interface li,
+    .patient-interface label,
+    .patient-interface th,
+    .patient-interface td {
+        font-size: 1.375rem;
+    }
+
+    .patient-interface .diagnostic-layout {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Evita que el contenido de ejercicios fuerce desplazamiento horizontal. */
+    .patient-interface .exercise-page__hero {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .patient-interface .exercise-page__cards {
+        --bs-gutter-x: 1rem;
+        --bs-gutter-y: 1rem;
+    }
+}
+
 .video-panel {
     position: relative;
     border-radius: 22px;
@@ -395,6 +783,10 @@ body {
         padding: 24px 18px;
     }
 
+    .main-content {
+        margin-left: 230px;
+    }
+
     .sidebar-brand-title h2 {
         font-size: 1.45rem;
     }
@@ -420,6 +812,10 @@ body {
         position: relative;
         border-right: 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .main-content {
+        margin-left: 0;
     }
 
     .sidebar .nav {
@@ -462,6 +858,217 @@ body {
 
     .sidebar .nav-link {
         width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-toggle {
+        display: inline-flex;
+        position: relative;
+        z-index: 1045;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1040;
+        width: min(84vw, 300px);
+        height: 100vh;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        box-shadow: 10px 0 28px rgba(7, 11, 18, 0.28);
+    }
+
+    .patient-interface .sidebar {
+        position: fixed;
+        width: min(84vw, 300px);
+        min-height: 100vh;
+    }
+
+    .sidebar.is-open {
+        transform: translateX(0);
+    }
+
+    .sidebar .nav {
+        flex-direction: column !important;
+    }
+
+    .sidebar .nav-link {
+        width: 100%;
+    }
+
+    .main-content {
+        padding-top: 1rem !important;
+    }
+
+    .patient-interface .main-content {
+        padding-top: 1rem !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+/* Ajuste progresivo para que el contenido se adapte al viewport. */
+@media (max-width: 1200px) {
+    .patient-interface {
+        font-size: 1.25rem;
+    }
+
+    .patient-interface .main-content {
+        padding: 1.25rem !important;
+        margin-left: 250px;
+    }
+
+    .patient-interface .sidebar {
+        flex-basis: 250px;
+        width: 250px;
+        padding: 24px 18px;
+    }
+
+    .patient-interface .sidebar .nav-link {
+        font-size: 1.2rem;
+        min-height: 54px;
+    }
+
+    .patient-interface .hero-panel h1,
+    .patient-interface .info-panel h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+    }
+}
+
+@media (max-width: 992px) {
+    .app-layout {
+        display: block;
+    }
+
+    .sidebar,
+    .patient-interface .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1040;
+        width: min(84vw, 300px);
+        min-height: 100vh;
+        height: 100vh;
+        transform: translateX(-105%);
+        overflow-y: auto;
+        transition: transform 0.25s ease;
+    }
+
+    .sidebar.is-open {
+        transform: translateX(0);
+    }
+
+    .sidebar .nav {
+        flex-direction: column !important;
+        flex-wrap: nowrap;
+    }
+
+    .sidebar .nav-link {
+        width: 100%;
+    }
+
+    .mobile-menu-toggle {
+        display: inline-flex;
+        position: relative;
+        z-index: 1045;
+    }
+
+    .main-content,
+    .patient-interface .main-content {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        padding: 1rem !important;
+        margin-left: 0;
+    }
+
+    .app-header {
+        min-height: 40px;
+        margin-bottom: 0.25rem;
+    }
+
+    .patient-interface .card-body {
+        padding: 1.25rem !important;
+    }
+
+    .patient-interface .btn,
+    .patient-interface .form-select,
+    .patient-interface .form-control {
+        min-height: 52px;
+        font-size: 1.15rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .app-header {
+        gap: 0.5rem;
+        min-height: 48px;
+    }
+
+    .mobile-menu-toggle {
+        width: 40px;
+        height: 40px;
+    }
+
+    .user-menu-trigger > .text-end {
+        max-width: min(45vw, 150px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .main-content,
+    .patient-interface .main-content {
+        padding-right: 0.75rem !important;
+        padding-left: 0.75rem !important;
+    }
+
+    .user-name {
+        font-size: 0.95rem;
+    }
+
+    .user-role {
+        font-size: 0.8rem;
+    }
+
+    .patient-interface {
+        font-size: 1.1rem;
+    }
+
+    .patient-interface .hero-panel {
+        padding: 1.25rem !important;
+    }
+
+    .patient-interface .hero-panel h1,
+    .patient-interface .info-panel h1 {
+        font-size: 1.8rem;
+    }
+
+    .patient-interface p,
+    .patient-interface li,
+    .patient-interface label,
+    .patient-interface th,
+    .patient-interface td {
+        font-size: 1.1rem;
+    }
+
+    .patient-interface .small,
+    .patient-interface small,
+    .patient-interface .text-muted,
+    .patient-interface .text-secondary {
+        font-size: 1rem !important;
     }
 }
 
@@ -520,6 +1127,245 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Rail lateral colapsable: conserva la navegación visible sin cubrir el contenido. */
+.app-layout {
+    --sidebar-expanded-width: clamp(240px, 20vw, 300px);
+    --sidebar-collapsed-width: 76px;
+}
+
+.app-layout .sidebar {
+    width: var(--sidebar-expanded-width);
+    flex-basis: var(--sidebar-expanded-width);
+    z-index: 1100;
+    transition: width 0.25s ease, flex-basis 0.25s ease, padding 0.25s ease;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.app-layout .sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+.app-layout .main-content {
+    margin-left: var(--sidebar-expanded-width);
+    transition: margin-left 0.25s ease;
+}
+
+.app-layout .main-content,
+.app-layout .patient-interface .main-content {
+    padding-top: 1rem !important;
+}
+
+.app-layout .mobile-menu-toggle {
+    display: inline-flex;
+    position: relative;
+    z-index: 1045;
+    margin-left: auto;
+    color: #d8e3f2;
+    background: transparent;
+}
+
+.app-layout .mobile-menu-toggle:hover,
+.app-layout .mobile-menu-toggle:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.app-layout .sidebar-brand {
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.app-layout .sidebar-brand .mobile-menu-toggle {
+    order: 2;
+    margin-left: auto;
+}
+
+.app-layout .sidebar-brand-title {
+    min-width: 0;
+}
+
+.app-layout .nav-link {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.app-layout .nav-link .nav-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-layout .nav-link[data-tooltip] {
+    position: relative;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar {
+    width: var(--sidebar-collapsed-width);
+    flex-basis: var(--sidebar-collapsed-width);
+    padding-right: 10px;
+    padding-left: 10px;
+    overflow: visible;
+}
+
+.app-layout.is-sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand {
+    gap: 0;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand .mobile-menu-toggle {
+    order: -1;
+    margin-left: 0;
+    margin-bottom: 8px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-logo-slot {
+    width: 40px;
+    height: 40px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar-brand-title {
+    display: none;
+}
+
+.app-layout.is-sidebar-collapsed .mobile-menu-toggle {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar .nav-link {
+    justify-content: center;
+    padding-right: 8px;
+    padding-left: 8px;
+}
+
+.app-layout.is-sidebar-collapsed .sidebar .nav-link .me-2 {
+    margin-right: 0 !important;
+}
+
+.app-layout.is-sidebar-collapsed .nav-label {
+    display: none;
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 12px);
+    z-index: 1201;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: #ffffff;
+    background: #111827;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(4px, -50%);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:hover::after,
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
+}
+
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:hover,
+.app-layout.is-sidebar-collapsed .nav-link[data-tooltip]:focus-visible {
+    z-index: 1200;
+}
+
+@media (max-width: 1200px) {
+    .app-layout {
+        --sidebar-expanded-width: 230px;
+    }
+}
+
+@media (max-width: 992px) {
+    .app-layout {
+        --sidebar-expanded-width: min(84vw, 300px);
+        display: block;
+    }
+
+    .app-layout .sidebar,
+    .app-layout .patient-interface .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: var(--sidebar-expanded-width);
+        height: 100vh;
+        min-height: 100vh;
+        transform: none;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .app-layout .main-content,
+    .app-layout .patient-interface .main-content {
+        width: 100%;
+        max-width: 100%;
+        margin-left: var(--sidebar-expanded-width);
+        padding: 1rem !important;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar,
+    .app-layout.is-sidebar-collapsed .patient-interface .sidebar {
+        width: var(--sidebar-collapsed-width);
+        overflow: visible;
+    }
+
+    .app-layout.is-sidebar-collapsed .main-content,
+    .app-layout.is-sidebar-collapsed .patient-interface .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+}
+
+@media (max-width: 576px) {
+    .app-layout {
+        --sidebar-collapsed-width: 64px;
+    }
+
+    .app-layout .sidebar {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .app-layout .sidebar-logo-slot {
+        width: 44px;
+        height: 44px;
+    }
+
+    .app-layout.is-sidebar-collapsed .sidebar-logo-slot {
+        width: 34px;
+        height: 34px;
+    }
+
+    .app-layout .sidebar-brand {
+        gap: 8px;
+    }
 }
 
 .image-slot .image-placeholder.is-hidden {

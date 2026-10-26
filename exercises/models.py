@@ -26,6 +26,15 @@ class Profile(models.Model):
 
     # Vinculación con la cuenta principal de Django
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+
+    # Doctores responsables del seguimiento del paciente.
+    assigned_doctors = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='assigned_patient_profiles',
+        limit_choices_to={'profile__role': 'doctor'},
+        verbose_name='Doctores asignados',
+    )
     
     # Datos básicos de identificación y rol
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient')
@@ -72,6 +81,98 @@ class ExerciseSession(models.Model):
 
     def __str__(self):
         return f"{self.test_type} - {self.patient.username} ({self.created_at.strftime('%d/%m/%y')})"
+
+
+class Evaluation(models.Model):
+    """Resultado clínico de una evaluación basal o final por prueba."""
+
+    TYPE_CHOICES = (
+        ('INICIAL', 'Inicial'),
+        ('FINAL', 'Final'),
+    )
+    EXERCISE_CHOICES = (
+        ('Equilibrio Estatico', 'Equilibrio Estático'),
+        ('Soporte Monopodal', 'Soporte Monopodal'),
+        ('Marcha Tandem', 'Marcha Tándem'),
+    )
+
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='evaluations')
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    exercise_name = models.CharField(max_length=40, choices=EXERCISE_CHOICES)
+    date = models.DateTimeField(auto_now_add=True)
+    stability_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    deviation_cm = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    angle_deg = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['patient', 'type', 'exercise_name'],
+                name='one_evaluation_per_phase_exercise',
+            )
+        ]
+        ordering = ['date']
+
+
+class DailySession(models.Model):
+    """Sesión diaria de entrenamiento, con sus tres bloques de ejercicios."""
+
+    STATUS_CHOICES = (
+        ('COMPLETADA', 'Completada'),
+        ('INCOMPLETA', 'Incompleta'),
+    )
+
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_sessions')
+    day_number = models.PositiveSmallIntegerField()
+    date = models.DateField(auto_now_add=True)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='INCOMPLETA')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['patient', 'day_number'],
+                name='one_daily_session_per_day_number',
+            )
+        ]
+        ordering = ['day_number']
+
+
+class SessionExerciseDetail(models.Model):
+    """Acumulado de un ejercicio dentro de una sesión diaria."""
+
+    EXERCISE_CHOICES = Evaluation.EXERCISE_CHOICES
+    session = models.ForeignKey(DailySession, on_delete=models.CASCADE, related_name='exercise_details')
+    exercise_name = models.CharField(max_length=40, choices=EXERCISE_CHOICES)
+    correct_repetitions = models.PositiveIntegerField(default=0)
+    incorrect_repetitions = models.PositiveIntegerField(default=0)
+    total_duration_sec = models.PositiveIntegerField(default=0)
+    average_stability_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    average_deviation_cm = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    samples_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'exercise_name'],
+                name='one_detail_per_session_exercise',
+            )
+        ]
+
+
+class ExerciseRepetition(models.Model):
+    """Evento inmutable emitido al terminar cada repetición de 30 segundos."""
+
+    RESULT_CHOICES = (('OK', 'Correcta'), ('NOK', 'Incorrecta'))
+    detail = models.ForeignKey(
+        SessionExerciseDetail,
+        on_delete=models.CASCADE,
+        related_name='repetitions',
+    )
+    result = models.CharField(max_length=3, choices=RESULT_CHOICES)
+    duration_sec = models.PositiveSmallIntegerField(default=30)
+    stability_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    deviation_cm = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 # =============================================================================
@@ -144,6 +245,17 @@ class Appointment(models.Model):
     date = models.DateTimeField(verbose_name="Fecha y Hora")
     reason = models.CharField(max_length=200, verbose_name="Motivo")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas del Doctor")
+    STATUS_CHOICES = (
+        ('PENDIENTE', 'Pendiente'),
+        ('COMPLETADA', 'Completada'),
+        ('CANCELADA', 'Cancelada'),
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=STATUS_CHOICES,
+        default='PENDIENTE',
+        verbose_name='Estado',
+    )
     is_completed = models.BooleanField(default=False, verbose_name="¿Cita concluida?")
     created_at = models.DateTimeField(auto_now_add=True)
 
