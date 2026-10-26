@@ -9,7 +9,7 @@
     <div class="hero-panel p-4 rounded-4 text-white" style="background: linear-gradient(135deg, #0f766e, #0369a1);">
         <span class="badge bg-warning text-dark mb-2">Día {{ day_number }} de 15</span>
         <h1 class="fw-bold mb-2">Rutina diaria de equilibrio</h1>
-        <p class="mb-0">Tres ejercicios, 5 repeticiones de 30 segundos cada uno y descansos de 15 segundos.</p>
+        <p class="mb-0">Posición en tándem, apoyo unipodal y postura del árbol: 6 repeticiones de 20 segundos cada uno (3 con cada pierna, alternando), con descansos de 15 segundos.</p>
     </div>
 </section>
 
@@ -21,7 +21,7 @@
                 <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill">Listo para comenzar</span>
             </div>
             <div class="camera-stage position-relative" style="height:500px;background:#000;">
-                <video id="webcam" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;position:absolute;transform:scaleX(-1);"></video>
+                <video id="webcam" data-session-id="{{ daily_session.id }}" data-day-number="{{ day_number }}" data-test-type="Marcha Tandem" data-side="der" data-duration-sec="20" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;position:absolute;transform:scaleX(-1);"></video>
                 <canvas id="output_canvas" style="width:100%;height:100%;object-fit:contain;position:absolute;z-index:10;"></canvas>
                 <div id="cameraPlaceholder" class="text-white text-center position-absolute top-50 start-50 translate-middle">
                     <i class="fas fa-camera fa-3x mb-3 text-secondary"></i>
@@ -34,12 +34,13 @@
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
                 <h2 id="routineState" class="fw-bold text-success">PREPARADO</h2>
-                <p id="exerciseLabel" class="fs-5 mb-1">Equilibrio Estático</p>
-                <div id="routineTimer" class="display-1 fw-bold text-primary">00:30</div>
+                <p id="exerciseLabel" class="fs-5 mb-1">Posición en tándem</p>
+                <p id="sideLabel" class="fw-semibold text-secondary mb-1">Pie adelante: DERECHA</p>
+                <div id="routineTimer" class="display-1 fw-bold text-primary">00:20</div>
                 <select id="testTypeSelect" class="form-select visually-hidden" aria-label="Ejercicio actual">
-                    <option value="Equilibrio Estatico">Equilibrio Estático</option>
-                    <option value="Soporte Monopodal">Soporte Monopodal</option>
-                    <option value="Marcha Tandem">Marcha Tándem</option>
+                    <option value="Marcha Tandem">Posición en tándem</option>
+                    <option value="Soporte Monopodal">Apoyo unipodal</option>
+                    <option value="Postura del Arbol">Postura del árbol</option>
                 </select>
                 <div class="d-flex gap-3 my-3">
                     <div class="flex-fill text-center bg-success-subtle rounded-3 p-2"><small>ÉXITOS</small><div id="successCount" class="fs-3 fw-bold text-success">0</div></div>

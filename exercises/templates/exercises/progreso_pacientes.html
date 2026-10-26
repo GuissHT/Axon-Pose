@@ -15,8 +15,9 @@
                 <thead class="table-light">
                     <tr>
                         <th class="border-0 rounded-start py-3">Paciente</th>
-                        <th class="border-0 py-3 text-center">Sesiones</th>
-                        <th class="border-0 py-3 text-center">Estabilidad Prom.</th>
+                        <th class="border-0 py-3 text-center">Rutinas</th>
+                        <th class="border-0 py-3 text-center">Repeticiones correctas</th>
+                        <th class="border-0 py-3 text-center">Romberg</th>
                         <th class="border-0 py-3 text-center">Encuesta</th>
                         <th class="border-0 py-3">Última Actividad</th>
                         <th class="border-0 py-3">Estado</th>
@@ -31,12 +32,21 @@
                             <small class="text-muted">CI: {{ p.ci }} | ID: #{{ p.user_id|stringformat:"04d" }}</small>
                         </td>
                         <td class="text-center">
-                            <span class="badge rounded-pill bg-light text-dark border px-3">{{ p.sessions_count }}</span>
+                            <span class="badge rounded-pill bg-light text-dark border px-3">{{ p.routine_sessions }}</span>
+                            <div class="text-muted smaller">{{ p.routine_completed }} completas</div>
                         </td>
                         <td class="text-center">
-                            <div class="fw-bold {% if p.avg_stability >= 80 %}text-success{% elif p.avg_stability >= 60 %}text-warning{% else %}text-danger{% endif %}">
-                                {{ p.avg_stability }}%
-                            </div>
+                            {% if p.routine_reps %}
+                                <div class="fw-bold {% if p.routine_pct >= 80 %}text-success{% elif p.routine_pct >= 60 %}text-warning{% else %}text-danger{% endif %}">{{ p.routine_pct }}%</div>
+                                <div class="text-muted smaller">{{ p.routine_correct }} de {{ p.routine_reps }}</div>
+                            {% else %}<span class="text-muted small">-</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.romberg.inicial %}
+                                <div class="small">Inicial: {{ p.romberg.inicial.sway_closed_cm }} cm</div>
+                                {% if p.romberg.final %}<div class="small">Final: {{ p.romberg.final.sway_closed_cm }} cm</div>{% endif %}
+                                <div class="text-muted smaller">balanceo con ojos cerrados</div>
+                            {% else %}<span class="badge rounded-pill bg-warning text-dark px-3">Pendiente</span>{% endif %}
                         </td>
                         <td class="text-center">
                             {% if p.survey_status == 'Completo' %}
@@ -68,7 +78,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted">
+                        <td colspan="8" class="text-center py-5 text-muted">
                             <i class="fas fa-users-slash fa-3x mb-3 opacity-25"></i><br>
                             No hay pacientes registrados en el sistema.
                         </td>

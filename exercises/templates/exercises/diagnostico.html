@@ -6,17 +6,50 @@
 {% block content %}
 {% if not is_doctor %}
 <meta name="csrf-token" content="{{ csrf_token }}">
+{% if romberg.inicial %}
+<!-- Mediciones de referencia ya registradas -->
+<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-1"><i class="fas fa-stethoscope me-2 text-primary"></i> Sus evaluaciones de Romberg</h5>
+        <p class="text-muted small mb-3">Balanceo lateral medido con la cámara. Es una referencia para seguir su evolución, no una calificación.</p>
+        <div class="row g-3">
+            {% for nombre, t in romberg_cards %}
+            <div class="col-md-6">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                    <div class="fw-bold">{{ nombre }} <small class="text-muted fw-normal">{{ t.created_at|date:"d/m/Y" }}</small></div>
+                    <div class="mt-2">Ojos abiertos: <strong>{{ t.sway_open_cm }} cm</strong> <small class="text-muted">{{ t.side_open }}</small></div>
+                    <div>Ojos cerrados: <strong>{{ t.sway_closed_cm }} cm</strong> <small class="text-muted">{{ t.side_closed }}</small></div>
+                    {% if t.doctor_note %}<div class="small text-muted mt-2">Nota del doctor: {{ t.doctor_note }}</div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if romberg.cambio_cerrados is not None %}
+        <p class="mt-3 mb-0">Cambio con ojos cerrados: <strong>{{ romberg.cambio_cerrados }} cm</strong> <small class="text-muted">(negativo = se balancea menos que al inicio)</small></p>
+        {% endif %}
+        {% if not evaluation_type %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <a href="{% url 'rutina_diaria' %}" class="btn btn-success rounded-pill px-4 fw-bold">Ir a la rutina diaria</a>
+            {% if not romberg.final %}
+            <a href="{% url 'evaluacion' %}?phase=FINAL" class="btn btn-outline-primary rounded-pill px-4">Hacer la evaluación final (al terminar el programa)</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% if evaluation_type %}
 <section class="diagnostic-layout diagnostic-layout--romberg">
     <article class="info-panel" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
-        <span class="badge bg-primary mb-2 align-self-start px-3 py-2 rounded-pill"><i class="fas fa-stethoscope me-1"></i> Evaluación {{ evaluation_type|title }}</span>
+        <span class="badge bg-primary mb-2 align-self-start px-3 py-2 rounded-pill"><i class="fas fa-stethoscope me-1"></i> Evaluación {{ evaluation_type|lower }}</span>
         <h1 class="fw-bold mb-3">Evaluación de Romberg</h1>
-        <p class="text-secondary" style="font-size: 1.1rem;">Siga las instrucciones y mantenga la posición por 30 segundos para obtener estabilidad y desviación lateral en tiempo real.</p>
+        <p class="text-secondary" style="font-size: 1.1rem;">Párese con los pies juntos 30 segundos con los ojos abiertos y 30 segundos con los ojos cerrados. El sistema mide cuánto se balancea y hacia qué lado y lo guarda como referencia{% if evaluation_type == 'INICIAL' %}; después podrá empezar la rutina diaria{% else %}, para compararlo con la evaluación inicial{% endif %}.</p>
 
         <div class="card border-0 bg-light rounded-4 mb-3" style="border-left: 4px solid #1f5d88 !important;">
             <div class="card-body">
                 <h5 class="fw-bold text-dark"><i class="fas fa-info-circle me-2 text-primary"></i> Instrucción principal</h5>
                 <ul class="mb-0 ps-3">
-                    <li>Ubíquese de pie frente a la cámara.</li>
+                    <li>Ubíquese de pie frente a la cámara, de modo que se vea de la cabeza a los pies.</li>
                     <li>Mantenga los pies juntos y la postura recta.</li>
                     <li>Coloque las manos pegadas a los lados del cuerpo o extendidas hacia adelante.</li>
                     <li>Mantenga la mirada fija al frente durante los 30 segundos.</li>
@@ -42,6 +75,8 @@
                 <div id="testProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill" style="width: 0%"></div>
             </div>
 
+            <div id="rombergResult" class="mb-3" aria-live="polite"></div>
+
             <div class="d-grid gap-3 d-sm-flex">
                 <button id="btnStartEval" class="btn btn-warning btn-lg flex-fill fw-bold rounded-pill shadow-sm" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white;">
                     <i class="fas fa-play me-2"></i> Comenzar evaluación
@@ -56,7 +91,7 @@
     <article class="video-panel position-relative video-panel--romberg" style="background: #0f172a; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); min-height: 400px; display: flex; flex-direction: column;">
         <div class="d-flex justify-content-between p-3 position-absolute w-100 z-1 camera-status">
             <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill shadow"><i class="fas fa-video-slash me-1"></i> Cámara inactiva</span>
-            <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill shadow"><i class="fas fa-ruler-combined me-1"></i> Alineación en espera</span>
+            <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill shadow"><i class="fas fa-ruler-combined me-1"></i> En espera</span>
         </div>
 
         <div class="camera-stage flex-grow-1 position-relative" style="display: flex; justify-content: center; align-items: center; background-color: #000;">
@@ -70,73 +105,72 @@
 
         <div class="metrics-overlay p-3 d-flex gap-2 position-absolute bottom-0 w-100" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); z-index: 20;">
             <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Estabilidad %</small>
-                <div id="metricStability" class="text-white fw-bold fs-4">0%</div>
+                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Balanceo</small>
+                <div id="metricSway" class="text-white fw-bold fs-4">-- cm</div>
             </div>
             <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Desviación cm</small>
-                <div id="metricDeviation" class="text-white fw-bold fs-4">0.0 cm</div>
+                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Hacia</small>
+                <div id="metricSide" class="text-white fw-bold fs-4">--</div>
             </div>
             <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Ángulo</small>
+                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Tronco</small>
                 <div id="metricAngle" class="text-white fw-bold fs-4">--</div>
             </div>
         </div>
     </article>
 </section>
 {% endif %}
+{% endif %}
 
 {% if is_doctor %}
 <div class="card border-0 shadow-sm rounded-4 mt-0 doctor-results-card" style="background: rgba(255, 255, 255, 0.9); min-height: 75vh;">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-4 text-dark results-title"><i class="fas fa-users-viewfinder text-primary me-2"></i> Estado de pacientes y evaluación previa</h5>
+        <h5 class="fw-bold mb-1 text-dark results-title"><i class="fas fa-users-viewfinder text-primary me-2"></i> Evaluación de Romberg por paciente</h5>
+        <p class="text-muted small mb-4">Balanceo lateral medido con la cámara: la evaluación inicial (antes de la primera rutina) y la final (opcional). Puede dejar una nota en cada una.</p>
         <div class="table-responsive results-table-wrapper">
             <table class="table table-hover align-middle results-table">
                 <thead class="table-light">
                     <tr>
                         <th class="border-0 rounded-start">Paciente</th>
-                        <th class="border-0">Última Prueba</th>
-                        <th class="border-0 text-center">Estabilidad (%)</th>
-                        <th class="border-0 text-center">Desviación (cm)</th>
-                        <th class="border-0 text-center">Fecha</th>
-                        <th class="border-0 rounded-end text-end">Estado</th>
+                        <th class="border-0">Inicial</th>
+                        <th class="border-0">Final</th>
+                        <th class="border-0 text-center">Cambio (ojos cerrados)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for patient in patient_list %}
+                    {% for row in patient_rows %}
                     <tr>
                         <td data-label="Paciente">
-                            <div class="fw-bold text-dark">{{ patient.full_name }}</div>
+                            <div class="fw-bold text-dark">{{ row.full_name }}</div>
+                            <a class="small" href="{% url 'progreso_paciente' row.user.id %}">Ver progreso</a>
                         </td>
-                        <td data-label="Última prueba">
-                            <span class="text-secondary">{{ patient.last_test }}</span>
-                        </td>
-                        <td class="text-center" data-label="Estabilidad (%)">
-                            {% if patient.last_stability != 'N/A' %}
-                                <div class="fw-bold {% if patient.last_stability|add:0 >= 80 %}text-success{% elif patient.last_stability|add:0 >= 60 %}text-warning{% else %}text-danger{% endif %}">
-                                    {{ patient.last_stability }}%
-                                </div>
+                        {% for t in row.tests %}
+                        <td data-label="{% if forloop.first %}Inicial{% else %}Final{% endif %}">
+                            {% if t %}
+                                <div class="small text-muted">{{ t.created_at|date:"d/m/Y" }}</div>
+                                <div>Ojos abiertos: <strong>{{ t.sway_open_cm }} cm</strong> <small class="text-muted">{{ t.side_open }}</small></div>
+                                <div>Ojos cerrados: <strong>{{ t.sway_closed_cm }} cm</strong> <small class="text-muted">{{ t.side_closed }}</small></div>
+                                <form method="post" action="{% url 'nota_romberg' t.id %}" class="d-flex gap-2 mt-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <input type="text" name="note" class="form-control form-control-sm" maxlength="300" placeholder="Nota (p. ej. se sujetó)" value="{{ t.doctor_note }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill">Guardar</button>
+                                </form>
+                            {% elif forloop.first %}
+                                <span class="badge rounded-pill bg-warning text-dark">Pendiente</span>
+                                <div class="small text-muted">No puede empezar la rutina hasta hacerla.</div>
                             {% else %}
-                                <span class="text-muted">-</span>
+                                <span class="text-muted small">No realizada</span>
                             {% endif %}
                         </td>
-                        <td class="text-center" data-label="Desviación (cm)">
-                            <span class="fw-semibold">{{ patient.last_deviation }}{% if patient.last_deviation != 'N/A' %} cm{% endif %}</span>
-                        </td>
-                        <td class="text-center text-muted small" data-label="Fecha">
-                            {{ patient.last_date }}
-                        </td>
-                        <td class="text-end" data-label="Estado">
-                            {% if patient.last_test == 'Ninguna' %}
-                                <span class="badge rounded-pill bg-light text-secondary border">Sin registrar</span>
-                            {% else %}
-                                <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">Completado</span>
-                            {% endif %}
+                        {% endfor %}
+                        <td class="text-center" data-label="Cambio">
+                            {% if row.romberg.cambio_cerrados is not None %}{{ row.romberg.cambio_cerrados }} cm{% else %}-{% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center py-4 text-muted">No hay pacientes registrados aún.</td>
+                        <td colspan="4" class="text-center py-4 text-muted">No hay pacientes registrados aún.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -387,9 +421,8 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if not is_doctor %}
+{% if evaluation_type %}
 <!-- Librerias CDN de MediaPipe Pose para analisis en frontend. -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="{% static 'exercises/js/camera.js' %}"></script>

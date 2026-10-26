@@ -1,6 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 import json
+import logging
 from collections import defaultdict
 
 from django.contrib import messages
@@ -12,6 +13,9 @@ from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 from .forms import (
     AppointmentForm,
@@ -21,12 +25,10 @@ from .forms import (
     DoctorAdviceForm,
 )
 from .models import (
-    Profile, ExerciseSession, Evaluation, DailySession, SessionExerciseDetail,
-    ExerciseRepetition, Question, PatientAnswer, DoctorAdvice, Appointment,
+    Profile, Evaluation, DailySession, SessionExerciseDetail, ExerciseRepetition,
+    RombergTest, Question, PatientAnswer, DoctorAdvice, Appointment,
 )
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+from .vision import clasificador, romberg
 
 # =============================================================================
 # FUNCIONES DE UTILIDAD Y SEGURIDAD
@@ -46,39 +48,6 @@ def _is_doctor(user) -> bool:
         return user.profile.role == 'doctor'
     except Profile.DoesNotExist:
         return False
-
-
-def _is_patient(user) -> bool:
-    """
-    Verifica si el usuario es un paciente (autenticado y no es doctor).
-    """
-    return user.is_authenticated and not _is_doctor(user)
-
-
-def _get_available_doctors():
-    """
-    Busca y retorna una lista formateada de todos los doctores registrados.
-    Se usa para los selectores de citas y reportes.
-    """
-    doctors = Profile.objects.filter(role='doctor').select_related('user')
-    return [{
-        'id': d.user.id,
-        'name': d.user.get_full_name() or d.user.username,
-        'email': d.user.email,
-        'specialty': d.specialty or 'Rehabilitación Física'
-    } for d in doctors]
-
-
-def _quality_semaphore(score: float) -> str:
-    """
-    Clasifica el puntaje de calidad de la captura de video en tres niveles.
-    Ayuda al doctor a saber si la medicion fue confiable.
-    """
-    if score >= 80:
-        return 'Alta'
-    if score >= 60:
-        return 'Media'
-    return 'Baja'
 
 
 def _build_report_pdf(
@@ -144,44 +113,58 @@ def _build_report_pdf(
             pdf.drawString(margin_x, y, line_part)
             y -= 15
 
-    # --- SECCIÓN: DIAGNÓSTICO ACTUAL ---
+    # --- SECCIÓN: EVALUACIÓN DE ROMBERG (referencia inicial y final) ---
     y -= 13
     pdf.setFont('Helvetica-Bold', 12)
-    pdf.drawString(margin_x, y, 'Resumen de diagnóstico')
-
+    pdf.drawString(margin_x, y, 'Evaluación de Romberg (balanceo lateral)')
     y -= 20
     pdf.setFont('Helvetica', 11)
-    latest_eval = report_data.get('latest_eval') or {}
-    diagnostic_lines = [
-        f"- Última prueba: {latest_eval.get('test_type', 'Sin datos registrados')}.",
-        f"- Estabilidad actual: {latest_eval.get('stability', 'N/A')}%.",
-        f"- Desviación actual: {latest_eval.get('deviation_cm', 'N/A')} cm.",
-        f"- Alineación: {latest_eval.get('alignment', 'Sin determinar')}.",
-        f"- Calidad de medición: {latest_eval.get('quality_score', 'N/A')}%.",
-        f"- Semáforo de calidad: {_quality_semaphore(float(latest_eval.get('quality_score', 0) or 0))}.",
-    ]
-    for line in diagnostic_lines:
-        pdf.drawString(margin_x, y, line)
+    resumen = report_data.get('romberg') or {}
+    lineas = []
+    for nombre, t in (('Inicial', resumen.get('inicial')), ('Final', resumen.get('final'))):
+        if t:
+            lineas.append(
+                f"- {nombre} ({timezone.localtime(t.created_at).strftime('%Y-%m-%d')}): "
+                f"{t.sway_open_cm} cm con ojos abiertos ({t.side_open}), "
+                f"{t.sway_closed_cm} cm con ojos cerrados ({t.side_closed})."
+            )
+            if t.doctor_note:
+                lineas.append(f"  Nota del doctor: {t.doctor_note}")
+    if resumen.get('cambio_cerrados') is not None:
+        lineas.append(f"- Cambio con ojos cerrados: {resumen['cambio_cerrados']:+} cm "
+                      f"(negativo = menos balanceo).")
+    if not lineas:
+        lineas = ['- Aún no se registró la evaluación inicial.']
+    for line in lineas:
+        pdf.drawString(margin_x, y, line[:100])
         y -= 17
 
-    # --- SECCIÓN: HISTORIAL ---
-    y -= 10
-    pdf.setFont('Helvetica-Bold', 12)
-    pdf.drawString(margin_x, y, 'Historial reciente')
-
-    y -= 20
-    pdf.setFont('Helvetica', 11)
-    eval_history = report_data.get('history', [])
-    if eval_history:
-        history_lines = [
-            f"- {item['timestamp']} | {item['test_type']} | Estabilidad {item['stability']}% | Desviación {item['deviation_cm']} cm"
-            for item in eval_history[-3:]
+    # --- SECCIÓN: RUTINA DIARIA (resultados del modelo) ---
+    rutinas = report_data.get('rutinas')
+    if rutinas:
+        y -= 10
+        pdf.setFont('Helvetica-Bold', 12)
+        pdf.drawString(margin_x, y, 'Rutina diaria (entrenamiento)')
+        y -= 20
+        pdf.setFont('Helvetica', 11)
+        lineas = [
+            f"- Sesiones realizadas: {rutinas['num_sesiones']} (completadas: {rutinas['completadas']}).",
+            f"- Repeticiones: {rutinas['repeticiones']} | correctas: {rutinas['correctas']} "
+            f"| incorrectas: {rutinas['incorrectas']} | {rutinas['pct']}% correctas.",
         ]
-    else:
-        history_lines = ['- Aún no se registraron sesiones en este dispositivo.']
-    for line in history_lines:
-        pdf.drawString(margin_x, y, line)
-        y -= 17
+        for e in rutinas['por_ejercicio']:
+            if e['total']:
+                lineas.append(f"- {e['nombre']}: {e['ok']}/{e['total']} correctas ({e['pct']}%). "
+                              f"Error más frecuente: {e['error']}.")
+        for s in rutinas['sesiones'][:3]:
+            lineas.append(f"- Día {s['dia']} ({s['fecha'].strftime('%Y-%m-%d')}): {s['ok']}/{s['total']} "
+                          f"correctas ({s['pct']}%), {s['estado'].lower()}.")
+        for line in lineas:
+            pdf.drawString(margin_x, y, line[:100])
+            y -= 17
+        if y < 160:
+            pdf.showPage()
+            y = height - 60
 
     # --- SECCIÓN: OBSERVACIONES MÉDICAS ---
     y -= 10
@@ -381,7 +364,8 @@ def doctor_dashboard(request):
         'upcoming_appointments': upcoming_appointments,
         'patient_count': Profile.objects.filter(role='patient').count(),
         'questionnaire_completed': PatientAnswer.objects.values('patient').distinct().count(),
-        'session_count': ExerciseSession.objects.count(),
+        'session_count': RombergTest.objects.count(),
+        'routine_count': DailySession.objects.filter(exercise_details__samples_count__gt=0).distinct().count(),
     }
     return render(request, 'exercises/doctor_dashboard.html', context)
 
@@ -499,39 +483,46 @@ def ejercicio_tandem(request):
 @login_required
 def evaluacion(request):
     """
-    Muestra la evaluación para pacientes y el resumen de resultados para doctores.
+    Evaluación de Romberg (medición de referencia). El paciente hace la INICIAL antes de su primera
+    rutina y, si quiere, la FINAL al terminar el programa. El doctor ve las mediciones de cada
+    paciente y puede dejar una nota.
     """
-    selected_exercise = 'Equilibrio Estatico'
     is_doctor = _is_doctor(request.user)
-    patient_data = []
     if is_doctor:
-        patients = Profile.objects.filter(role='patient').select_related('user')
-        for p in patients:
-            last_session = ExerciseSession.objects.filter(patient=p.user).order_by('-created_at').first()
-            patient_data.append({
-                'full_name': p.user.get_full_name() or p.user.username,
-                'last_stability': last_session.stability if last_session else 'N/A',
-                'last_deviation': last_session.deviation_cm if last_session else 'N/A',
-                'last_test': last_session.test_type if last_session else 'Ninguna',
-                'last_date': last_session.created_at.strftime('%d/%m/%y') if last_session else '-'
+        patient_rows = []
+        for profile in Profile.objects.filter(role='patient').select_related('user'):
+            resumen = resumen_romberg(profile.user)
+            patient_rows.append({
+                'user': profile.user,
+                'full_name': profile.user.get_full_name() or profile.user.username,
+                'romberg': resumen,
+                'tests': [resumen['inicial'], resumen['final']],
             })
+        return render(request, 'exercises/diagnostico.html', {'is_doctor': True, 'patient_rows': patient_rows})
 
-    evaluation_type = request.GET.get('phase', 'INICIAL').upper()
-    if evaluation_type not in {'INICIAL', 'FINAL'}:
+    resumen = resumen_romberg(request.user)
+    # Qué evaluación toca: la inicial si falta; la final solo si el paciente la pide (?phase=FINAL).
+    if not resumen['inicial']:
         evaluation_type = 'INICIAL'
-    context = {
-        'selected_exercise': selected_exercise,
+    elif request.GET.get('phase', '').upper() == 'FINAL' and not resumen['final']:
+        evaluation_type = 'FINAL'
+    else:
+        evaluation_type = None  # nada pendiente: se muestran los resultados
+    return render(request, 'exercises/diagnostico.html', {
+        'is_doctor': False,
         'evaluation_type': evaluation_type,
-        'patient_list': patient_data,
-        'is_doctor': is_doctor,
-    }
-    return render(request, 'exercises/diagnostico.html', context)
+        'romberg': resumen,
+        'romberg_cards': [(n, t) for n, t in (('Inicial', resumen['inicial']), ('Final', resumen['final'])) if t],
+    })
 
 
 @login_required
 def rutina_diaria(request):
     """Prepara la siguiente sesión diaria sin crear duplicados."""
     if _is_doctor(request.user):
+        return redirect('evaluacion')
+    if not _romberg_valido(request.user, 'INICIAL'):
+        messages.info(request, 'Antes de la primera rutina, haga la evaluación inicial de Romberg.')
         return redirect('evaluacion')
     requested_day = request.GET.get('day')
     if requested_day:
@@ -540,12 +531,13 @@ def rutina_diaria(request):
         except (TypeError, ValueError):
             return redirect('rutina_diaria')
     else:
-        day_number = (
-            DailySession.objects.filter(patient=request.user)
-            .order_by('-day_number')
-            .values_list('day_number', flat=True)
-            .first() or 0
-        ) + 1
+        ultima = DailySession.objects.filter(patient=request.user).order_by('-day_number').first()
+        if ultima and ultima.status != 'COMPLETADA' and not ExerciseRepetition.objects.filter(
+                detail__session=ultima).exists():
+            # La sesión anterior se abrió pero no tiene ejercicios (p. ej. se recargó la página): se reutiliza.
+            day_number = ultima.day_number
+        else:
+            day_number = (ultima.day_number if ultima else 0) + 1
     if not 1 <= day_number <= 15:
         messages.error(request, 'El ciclo de rehabilitación admite días del 1 al 15.')
         return redirect('ejercicios')
@@ -661,65 +653,24 @@ def cargar_preguntas_estandar(request):
 @login_required
 def progreso(request, patient_id=None):
     """
-    Genera estadísticas detalladas y gráficas para un paciente.
-    Se usa tanto para el paciente mismo como para el doctor que lo supervisa.
+    Progreso de un paciente: rutina diaria (resultados del modelo), evaluaciones de Romberg y encuesta.
+    Lo ve el paciente (su propio progreso) y el doctor (cualquier paciente).
     """
     target_user = request.user
     is_viewing_other = False
-    
     if patient_id and _is_doctor(request.user):
-        target_user = User.objects.get(id=patient_id)
+        target_user = get_object_or_404(User, id=patient_id)
         is_viewing_other = True
 
-    eval_history = get_eval_history(target_user)
-    numeric_stability, numeric_deviation = [], []
-    session_rows = []
-    previous_stability = None
-    by_exercise = defaultdict(lambda: {'count': 0, 'stability_sum': 0.0, 'deviation_sum': 0.0})
-
-    # Procesar datos históricos para la tabla y gráficas
-    for index, item in enumerate(eval_history, start=1):
-        stab = item.get('stability', 0.0)
-        dev = item.get('deviation_cm', 0.0)
-        qual = item.get('quality_score', 0.0)
-
-        numeric_stability.append(stab)
-        numeric_deviation.append(dev)
-
-        ex_name = item.get('test_type', 'General')
-        by_exercise[ex_name]['count'] += 1
-        by_exercise[ex_name]['stability_sum'] += stab
-        by_exercise[ex_name]['deviation_sum'] += dev
-
-        delta = None if previous_stability is None else round(stab - previous_stability, 1)
-        previous_stability = stab
-
-        session_rows.append({
-            'session_number': index,
-            'timestamp': item.get('timestamp', 'S/F'),
-            'test_type': ex_name,
-            'stability': stab,
-            'deviation_cm': dev,
-            'quality_score': qual,
-            'quality_semaphore': _quality_semaphore(qual),
-            'delta_stability': delta,
-        })
-
-    # Preparar el contexto de la plantilla
+    rutinas = resumen_rutinas(target_user)
     context = {
         'target_user': target_user,
         'is_viewing_other': is_viewing_other,
-        'history_count': len(eval_history),
-        'avg_stability': round(sum(numeric_stability)/len(numeric_stability), 1) if numeric_stability else 0,
-        'avg_deviation': round(sum(numeric_deviation)/len(numeric_deviation), 1) if numeric_deviation else 0,
-        'best_stability': max(numeric_stability, default=0),
-        'session_rows': list(reversed(session_rows)),
+        'rutinas': rutinas,
+        'rutina_grafico': rutinas['grafico'],
+        'romberg': resumen_romberg(target_user),
+        'romberg_tests': RombergTest.objects.filter(patient=target_user),
         'survey_responses': PatientAnswer.objects.filter(patient=target_user).select_related('question'),
-        'chart_data': {
-            'labels': [f"S{row['session_number']}" for row in session_rows],
-            'stability': numeric_stability,
-            'deviation': numeric_deviation,
-        }
     }
     return render(request, 'exercises/historial.html', context)
 
@@ -730,25 +681,25 @@ def progreso_pacientes(request):
     if not _is_doctor(request.user):
         return redirect('progreso')
 
-    profiles = Profile.objects.filter(role='patient').select_related('user')
     summary = []
-
-    for profile in profiles:
-        sessions = ExerciseSession.objects.filter(patient=profile.user)
-        last = sessions.order_by('-created_at').first()
-        
-        avg_stab = sum(s.stability for s in sessions) / sessions.count() if sessions.exists() else 0
-        survey_filled = PatientAnswer.objects.filter(patient=profile.user).exists()
-
+    for profile in Profile.objects.filter(role='patient').select_related('user'):
+        rutinas = resumen_rutinas(profile.user)
+        romberg_paciente = resumen_romberg(profile.user)
+        ultimo = romberg_paciente['final'] or romberg_paciente['inicial']
+        actividades = [f for f in (ultimo.created_at if ultimo else None, rutinas['ultima']) if f]
         summary.append({
             'user_id': profile.user.id,
             'full_name': profile.user.get_full_name() or profile.user.username,
             'ci': profile.ci or '-',
-            'sessions_count': sessions.count(),
-            'last_activity': last.created_at if last else None,
-            'avg_stability': round(avg_stab, 1),
-            'status': 'Activo' if sessions.exists() else 'Inactivo',
-            'survey_status': 'Completo' if survey_filled else 'No completo'
+            'romberg': romberg_paciente,
+            'routine_sessions': rutinas['num_sesiones'],
+            'routine_completed': rutinas['completadas'],
+            'routine_reps': rutinas['repeticiones'],
+            'routine_correct': rutinas['correctas'],
+            'routine_pct': rutinas['pct'],
+            'last_activity': max(actividades) if actividades else None,
+            'status': 'Activo' if actividades else 'Inactivo',
+            'survey_status': 'Completo' if PatientAnswer.objects.filter(patient=profile.user).exists() else 'No completo',
         })
 
     return render(request, 'exercises/progreso_pacientes.html', {'patients_summary': summary})
@@ -764,10 +715,12 @@ def descargar_reporte_pdf(request):
     target_user = request.user
     p_id = request.GET.get('patient_id')
     if p_id and _is_doctor(request.user):
-        target_user = User.objects.get(id=p_id)
+        target_user = get_object_or_404(User, id=p_id)
 
-    eval_history = get_eval_history(target_user)
-    report_data = {'latest_eval': eval_history[-1] if eval_history else {}, 'history': eval_history}
+    report_data = {
+        'romberg': resumen_romberg(target_user),
+        'rutinas': resumen_rutinas(target_user),
+    }
     pdf_buffer = _build_report_pdf(
         report_data,
         observations=request.GET.get('obs', ''),
@@ -862,46 +815,83 @@ def agendar_cita(request):
 # =============================================================================
 
 @login_required
-def registrar_metricas(request):
-    """Recibe los datos del análisis MediaPipe por POST y los guarda."""
+def registrar_romberg(request):
+    """
+    Guarda una evaluación de Romberg (medición de referencia): recibe los puntos de las dos fases
+    (30 s con ojos abiertos y 30 s con ojos cerrados) y calcula el balanceo con vision/romberg.py.
+    INICIAL: una válida por paciente, antes de la primera rutina. FINAL: opcional, después de la inicial.
+    Si la cámara no vio bien al paciente, se guarda como no válida y se puede repetir.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+        evaluation_type = payload.get('evaluationType', 'INICIAL')
+        if evaluation_type not in dict(RombergTest.TYPE_CHOICES):
+            raise ValueError('Tipo de evaluación no válido.')
+        if _romberg_valido(request.user, evaluation_type):
+            return JsonResponse({'ok': False, 'error': 'Esta evaluación ya está registrada.'}, status=409)
+        if evaluation_type == 'FINAL' and not _romberg_valido(request.user, 'INICIAL'):
+            raise ValueError('Primero debe hacerse la evaluación inicial.')
+        width = float(payload.get('width') or 640)
+        height = float(payload.get('height') or 480)
+        fases = payload.get('phases') or {}
+        abiertos_frames, cerrados_frames = fases.get('open') or [], fases.get('closed') or []
+        if not isinstance(abiertos_frames, list) or not isinstance(cerrados_frames, list):
+            raise ValueError('Faltan los puntos de las fases.')
+        abiertos = romberg.analizar_fase(abiertos_frames, width, height)
+        cerrados = romberg.analizar_fase(cerrados_frames, width, height)
+        test = RombergTest.objects.create(
+            patient=request.user,
+            evaluation_type=evaluation_type,
+            valid=romberg.es_valida(abiertos, cerrados),
+            open_eyes=abiertos,
+            closed_eyes=cerrados,
+            sway_open_cm=abiertos['amplitud_cm'],
+            sway_closed_cm=cerrados['amplitud_cm'],
+            side_open=abiertos['lado'],
+            side_closed=cerrados['lado'],
+            romberg_ratio=romberg.cociente_romberg(abiertos, cerrados),
+            reference_points={
+                'puntos': list(romberg.PUNTOS_ROMBERG),
+                'ancho': width,
+                'alto': height,
+                'open': romberg.puntos_referencia(abiertos_frames),
+                'closed': romberg.puntos_referencia(cerrados_frames),
+            },
+        )
+        return JsonResponse({
+            'ok': True,
+            'id': test.id,
+            'valid': test.valid,
+            'type': test.get_evaluation_type_display(),
+            'open': abiertos,
+            'closed': cerrados,
+        })
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError) as error:
+        return JsonResponse({'ok': False, 'error': str(error)}, status=400)
+    except Exception as error:  # responder siempre en JSON
+        logging.getLogger(__name__).exception('Error en registrar_romberg')
+        return JsonResponse({'ok': False, 'error': f'Error al guardar la evaluación: {error}'}, status=500)
+
+
+@login_required
+def nota_romberg(request, test_id):
+    """El doctor deja una nota en una evaluación de Romberg (p. ej. si el paciente se sujetó)."""
+    if not _is_doctor(request.user):
+        messages.error(request, 'Solo el doctor puede anotar la evaluación.')
+        return redirect('inicio')
+    test = get_object_or_404(RombergTest, id=test_id)
     if request.method == 'POST':
-        try:
-            payload = json.loads(request.body.decode('utf-8'))
-            evaluation_type = payload.get('evaluationType')
-            if evaluation_type in {'INICIAL', 'FINAL'}:
-                exercise_name = payload.get('testType')
-                if exercise_name not in dict(Evaluation.EXERCISE_CHOICES):
-                    raise ValueError('La prueba de evaluación no es válida.')
-                if Evaluation.objects.filter(
-                    patient=request.user,
-                    type=evaluation_type,
-                    exercise_name=exercise_name,
-                ).exists():
-                    return JsonResponse(
-                        {'ok': False, 'error': 'Esta evaluación ya fue registrada.'},
-                        status=409,
-                    )
-                Evaluation.objects.create(
-                    patient=request.user,
-                    type=evaluation_type,
-                    exercise_name=exercise_name,
-                    stability_pct=payload.get('stability', 0),
-                    deviation_cm=payload.get('deviationCm', 0),
-                    angle_deg=payload.get('angleDeg', 0),
-                )
-            else:
-                ExerciseSession.objects.create(
-                    patient=request.user,
-                    test_type=payload.get('testType'),
-                    stability=payload.get('stability'),
-                    deviation_cm=payload.get('deviationCm'),
-                    alignment=payload.get('alignment'),
-                    quality_score=payload.get('qualityScore')
-                )
-            return JsonResponse({'ok': True})
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
-    return JsonResponse({'ok': False}, status=405)
+        test.doctor_note = request.POST.get('note', '').strip()[:300]
+        test.noted_by = request.user
+        test.noted_at = timezone.now()
+        test.save(update_fields=['doctor_note', 'noted_by', 'noted_at'])
+        messages.success(request, 'Nota guardada.')
+    siguiente = request.POST.get('next', '')
+    if url_has_allowed_host_and_scheme(siguiente, allowed_hosts={request.get_host()}):
+        return redirect(siguiente)
+    return redirect('evaluacion')
 
 
 @login_required
@@ -934,12 +924,19 @@ def registrar_repeticion(request, session_id):
                 session=session,
                 exercise_name=exercise_name,
             )
+            side = payload.get('side', '')
             ExerciseRepetition.objects.create(
                 detail=detail,
                 result=result,
                 duration_sec=duration,
                 stability_pct=stability,
                 deviation_cm=deviation,
+                side=side if side in {'der', 'izq'} else '',
+                model_windows=max(int(payload.get('modelWindows', 0) or 0), 0),
+                model_incorrect_pct=min(max(float(payload.get('modelIncorrectPct', 0) or 0), 0), 100),
+                main_error=str(payload.get('mainError', '') or '')[:40],
+                latency_ms=max(float(payload.get('latencyMs', 0) or 0), 0),
+                fps=max(float(payload.get('fps', 0) or 0), 0),
             )
             repetitions = detail.repetitions.all()
             count = repetitions.count()
@@ -955,6 +952,9 @@ def registrar_repeticion(request, session_id):
         return JsonResponse({'ok': False, 'error': 'Sesión no encontrada.'}, status=404)
     except (json.JSONDecodeError, TypeError, ValueError) as error:
         return JsonResponse({'ok': False, 'error': str(error)}, status=400)
+    except Exception as error:  # p. ej. migración pendiente: responder en JSON, no en HTML
+        logging.getLogger(__name__).exception('Error en registrar_repeticion')
+        return JsonResponse({'ok': False, 'error': f'Error al guardar la repetición: {error}'}, status=500)
 
 
 @login_required
@@ -968,7 +968,7 @@ def finalizar_rutina(request, session_id):
             )
         except DailySession.DoesNotExist:
             return JsonResponse({'ok': False, 'error': 'Sesión no encontrada.'}, status=404)
-        expected = set(dict(Evaluation.EXERCISE_CHOICES))
+        expected = set(Evaluation.ROUTINE_EXERCISES)
         completed = set(session.exercise_details.filter(samples_count__gt=0).values_list('exercise_name', flat=True))
         session.status = 'COMPLETADA' if expected <= completed else 'INCOMPLETA'
         session.save(update_fields=['status'])
@@ -977,66 +977,236 @@ def finalizar_rutina(request, session_id):
 
 @login_required
 def analizar_pose(request):
-    """Ejecuta el analizador Python correspondiente a la prueba activa."""
+    """
+    Recibe ~1 s de fotogramas (33 puntos de MediaPipe cada uno) y devuelve si la postura es
+    correcta o incorrecta, el error principal y el mensaje de corrección.
+    Modelos (entrenados el 26-oct-2026): SVM en tándem; regresión logística en unipodal y árbol.
+    No se guarda video: solo se procesan coordenadas.
+    """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
 
     try:
         payload = json.loads(request.body.decode('utf-8'))
         test_type = payload.get('testType')
-        landmarks = payload.get('landmarks')
-        if not isinstance(landmarks, list) or len(landmarks) < 33:
-            raise ValueError('La cámara no envió los 33 puntos corporales.')
-        analyzers = {
-            'Evaluacion inicial': (
-                'exercises.vision.evaluacion',
-                'evaluacion',
-            ),
-            'Equilibrio Estatico': (
-                'exercises.vision.evaluacion',
-                'evaluacion',
-            ),
-            'Marcha Tandem': (
-                'exercises.vision.ejercicio1',
-                'ejercicio1',
-            ),
-            'Postura del Arbol': (
-                'exercises.vision.ejercicio3',
-                'ejercicio3',
-            ),
-            'Soporte Monopodal': (
-                'exercises.vision.ejercicio2',
-                'ejercicio2',
-            ),
-        }
-        if test_type not in analyzers:
-            raise ValueError(f'Prueba no configurada: {test_type or "sin nombre"}.')
-        module_name, _ = analyzers[test_type]
-        module = __import__(module_name, fromlist=['analizar'])
-        result = module.analizar(landmarks)
-        return JsonResponse({'ok': True, **result})
+        side = payload.get('side', 'der')
+        width = float(payload.get('width') or 640)
+        height = float(payload.get('height') or 480)
+        frames = payload.get('frames')
+        if not isinstance(frames, list) or not frames:
+            raise ValueError('La cámara no envió fotogramas.')
+        frames = frames[-90:]  # como máximo ~3 s
+
+        if test_type in clasificador.EJERCICIOS:
+            result = clasificador.clasificar(test_type, frames, width, height, side,
+                                             bool(payload.get('inPosture')))
+            incorrect = result.get('incorrecto', False)
+            return JsonResponse({
+                'ok': True,
+                **result,
+                # claves que ya usaba camera.js
+                'alert': bool(result.get('valido') and incorrect),
+                'message': result.get('mensaje', ''),
+                'alignment': 'Requiere ajuste' if incorrect else 'Optima',
+            })
+
+        if test_type == 'Equilibrio Estatico':
+            # Romberg: balanceo de los últimos segundos (frames en el formato de 7 puntos de romberg.py)
+            fase = romberg.analizar_fase(frames, width, height)
+            if fase['amplitud'] is None:
+                return JsonResponse({'ok': True, 'valido': False,
+                                     'message': 'Colóquese de cuerpo entero frente a la cámara'})
+            lado = '' if fase['lado'] == 'centro' else f" hacia la {fase['lado']}"
+            return JsonResponse({
+                'ok': True,
+                'valido': True,
+                'amplitud_cm': fase['amplitud_cm'],
+                'lado': fase['lado'],
+                'tronco_g': fase['tronco_g'],
+                'message': f"Balanceo {fase['amplitud_cm']} cm{lado}",
+            })
+
+        raise ValueError(f'Prueba no configurada: {test_type or "sin nombre"}.')
     except (json.JSONDecodeError, TypeError, ValueError, IndexError, KeyError) as error:
         return JsonResponse({'ok': False, 'error': str(error)}, status=400)
-    except ImportError as error:
+    except (ImportError, OSError) as error:
         return JsonResponse(
             {'ok': False, 'error': f'No se pudo cargar el modelo: {error}'},
             status=500,
         )
+    except Exception as error:  # nunca devolver una página HTML de error a camera.js
+        logging.getLogger(__name__).exception('Error en analizar_pose')
+        return JsonResponse({'ok': False, 'error': f'Error interno del modelo: {error}'}, status=500)
+
+
+# --- Romberg: evaluación inicial y final de referencia ---
+
+def _romberg_valido(user, tipo):
+    """La evaluación de Romberg válida más reciente del tipo dado ('INICIAL' o 'FINAL'), o None."""
+    return RombergTest.objects.filter(patient=user, evaluation_type=tipo, valid=True).first()
+
+
+def resumen_romberg(user):
+    """Evaluación inicial y final (si existe) y cuánto cambió el balanceo (cm; negativo = menos balanceo)."""
+    inicial, final = _romberg_valido(user, 'INICIAL'), _romberg_valido(user, 'FINAL')
+
+    def cambio(campo):
+        a = getattr(inicial, campo, None) if inicial else None
+        b = getattr(final, campo, None) if final else None
+        return None if a is None or b is None else round(float(b) - float(a), 1)
+
+    return {
+        'inicial': inicial,
+        'final': final,
+        'cambio_abiertos': cambio('sway_open_cm'),
+        'cambio_cerrados': cambio('sway_closed_cm'),
+    }
+
+
+# --- Resumen de la rutina diaria (entrenamiento con el modelo) ---
+
+EJERCICIO_NOMBRE = {
+    'Marcha Tandem': 'Posición en tándem',
+    'Soporte Monopodal': 'Apoyo unipodal',
+    'Postura del Arbol': 'Postura del árbol',
+}
+ERROR_NOMBRE = {
+    'tronco_inclinado': 'Tronco inclinado',
+    'tronco_adelante': 'Tronco hacia adelante',
+    'tronco_atras': 'Tronco hacia atrás',
+    'cabeza_abajo': 'Cabeza abajo',
+    'brazos_elevados': 'Brazos muy arriba',
+    'brazos_abajo': 'Brazos abajo',
+    'brazos_recogidos': 'Brazos recogidos',
+    'pierna_cruzada': 'Pierna cruzada',
+    'perdida_equilibrio': 'Pérdida de equilibrio',
+    'pies_separados': 'Pies separados',
+    'pie_bajo': 'Pie poco elevado',
+    'pie_detras': 'Pie hacia atrás',
+    'pie_en_suelo': 'Pie en el suelo',
+    'pie_sobre_rodilla': 'Pie sobre la rodilla',
+    'fuera_de_posicion': 'Fuera de la postura',
+}
+
+
+def _nombre_error(clave):
+    return ERROR_NOMBRE.get(clave, (clave or '').replace('_', ' ').capitalize())
+
+
+def _pct(ok, total):
+    return round(100.0 * ok / total, 1) if total else 0.0
+
+
+def resumen_rutinas(user):
+    """
+    Acumula los resultados de todas las rutinas diarias del paciente:
+    sesiones, repeticiones correctas/incorrectas por ejercicio y por pierna, errores más frecuentes
+    y el detalle de cada repetición (evidencia del modelo). Solo cuenta sesiones con repeticiones.
+    """
+    sesiones = (
+        DailySession.objects.filter(patient=user)
+        .prefetch_related('exercise_details__repetitions')
+        .order_by('day_number')
+    )
+    orden = list(Evaluation.ROUTINE_EXERCISES)
+    acum = {
+        nombre: {'nombre': EJERCICIO_NOMBRE.get(nombre, nombre), 'total': 0, 'ok': 0,
+                 'der_total': 0, 'der_ok': 0, 'izq_total': 0, 'izq_ok': 0, 'errores': defaultdict(int)}
+        for nombre in orden
+    }
+    filas, ultima = [], None
+    total = correctas = completadas = 0
+    for sesion in sesiones:
+        detalles = sorted(
+            sesion.exercise_details.all(),
+            key=lambda d: orden.index(d.exercise_name) if d.exercise_name in orden else 99,
+        )
+        ejercicios, repeticiones = [], []
+        s_total = s_ok = 0
+        for detalle in detalles:
+            reps = sorted(detalle.repetitions.all(), key=lambda r: r.created_at)
+            if not reps:
+                continue
+            a = acum.setdefault(detalle.exercise_name, {
+                'nombre': EJERCICIO_NOMBRE.get(detalle.exercise_name, detalle.exercise_name), 'total': 0,
+                'ok': 0, 'der_total': 0, 'der_ok': 0, 'izq_total': 0, 'izq_ok': 0, 'errores': defaultdict(int)})
+            e_ok = sum(1 for r in reps if r.result == 'OK')
+            errores = defaultdict(int)
+            for r in reps:
+                bien = r.result == 'OK'
+                a['total'] += 1
+                a['ok'] += bien
+                if r.side in ('der', 'izq'):
+                    a[r.side + '_total'] += 1
+                    a[r.side + '_ok'] += bien
+                if not bien and r.main_error:
+                    errores[r.main_error] += 1
+                    a['errores'][r.main_error] += 1
+                ultima = r.created_at if ultima is None or r.created_at > ultima else ultima
+                repeticiones.append({
+                    'ejercicio': EJERCICIO_NOMBRE.get(detalle.exercise_name, detalle.exercise_name),
+                    'pierna': {'der': 'Derecha', 'izq': 'Izquierda'}.get(r.side, '-'),
+                    'resultado': r.result,
+                    'pct_incorrecto': float(r.model_incorrect_pct),
+                    'error': _nombre_error(r.main_error) if r.main_error else '-',
+                    'duracion': r.duration_sec,
+                    'hora': r.created_at,
+                })
+            principal = max(errores, key=errores.get) if errores else ''
+            ejercicios.append({
+                'nombre': EJERCICIO_NOMBRE.get(detalle.exercise_name, detalle.exercise_name),
+                'ok': e_ok, 'total': len(reps), 'pct': _pct(e_ok, len(reps)),
+                'error': _nombre_error(principal) if principal else '',
+            })
+            s_total += len(reps)
+            s_ok += e_ok
+        if not s_total:
+            continue  # sesión abierta sin ejercicios realizados
+        total += s_total
+        correctas += s_ok
+        completadas += sesion.status == 'COMPLETADA'
+        filas.append({
+            'id': sesion.id, 'dia': sesion.day_number, 'fecha': sesion.date, 'estado': sesion.status,
+            'ok': s_ok, 'total': s_total, 'pct': _pct(s_ok, s_total),
+            'ejercicios': ejercicios, 'repeticiones': repeticiones,
+        })
+    por_ejercicio = []
+    for nombre in list(acum):
+        a = acum[nombre]
+        if not a['total'] and nombre not in orden:
+            continue
+        principal = max(a['errores'], key=a['errores'].get) if a['errores'] else ''
+        por_ejercicio.append({
+            'nombre': a['nombre'], 'total': a['total'], 'ok': a['ok'], 'nok': a['total'] - a['ok'],
+            'pct': _pct(a['ok'], a['total']),
+            'pct_der': _pct(a['der_ok'], a['der_total']) if a['der_total'] else None,
+            'pct_izq': _pct(a['izq_ok'], a['izq_total']) if a['izq_total'] else None,
+            'error': _nombre_error(principal) if principal else '-',
+        })
+    return {
+        'sesiones': list(reversed(filas)),  # la más reciente primero
+        'num_sesiones': len(filas),
+        'completadas': completadas,
+        'repeticiones': total,
+        'correctas': correctas,
+        'incorrectas': total - correctas,
+        'pct': _pct(correctas, total),
+        'por_ejercicio': por_ejercicio,
+        'ultima': ultima,
+        'grafico': {
+            'labels': [f"Día {f['dia']}" for f in filas],
+            'pct': [f['pct'] for f in filas],
+            'por_ejercicio': [
+                {'nombre': EJERCICIO_NOMBRE.get(n, n),
+                 'datos': [next((e['pct'] for e in f['ejercicios'] if e['nombre'] == EJERCICIO_NOMBRE.get(n, n)), None)
+                           for f in filas]}
+                for n in orden
+            ],
+        },
+    }
 
 
 # --- Funciones de limpieza/edición auxiliar ---
-
-def get_eval_history(user):
-    """Retorna una lista limpia de sesiones del usuario para procesar."""
-    return [{
-        'timestamp': s.created_at.strftime('%Y-%m-%d %H:%M'),
-        'test_type': s.test_type,
-        'stability': float(s.stability),
-        'deviation_cm': float(s.deviation_cm),
-        'alignment': s.alignment,
-        'quality_score': float(s.quality_score),
-    } for s in ExerciseSession.objects.filter(patient=user).order_by('created_at')]
-
 
 @login_required
 def editar_pregunta(request, question_id):

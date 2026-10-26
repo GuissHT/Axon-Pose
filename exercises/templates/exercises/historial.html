@@ -26,81 +26,163 @@
     </div>
 </div>
 
-<div class="row g-4 mb-4">
-    <div class="col-md-6 col-xl-3">
-        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-calendar-check fa-2x text-primary"></i>
+<!-- ===================== RUTINA DIARIA (resultados del modelo) ===================== -->
+<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-1"><i class="fas fa-running me-2 text-success"></i> Rutina diaria: ejecuciones correctas e incorrectas</h5>
+        <p class="text-muted small mb-4">Cada repetición de 20 s la califica el modelo: es <strong>correcta</strong> si estuvo mal como mucho la mitad del tiempo.</p>
+
+        {% if rutinas.repeticiones %}
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                    <small class="text-uppercase text-secondary fw-bold">Sesiones</small>
+                    <h3 class="fw-bold mb-0">{{ rutinas.num_sesiones }}</h3>
+                    <small class="text-muted">{{ rutinas.completadas }} completas</small>
                 </div>
-                <div>
-                    <small class="text-uppercase text-secondary fw-bold">Sesiones Totales</small>
-                    <h3 class="fw-bold mb-0 text-dark">{{ history_count }}</h3>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                    <small class="text-uppercase text-secondary fw-bold">Repeticiones</small>
+                    <h3 class="fw-bold mb-0">{{ rutinas.repeticiones }}</h3>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="p-3 rounded-4 border h-100" style="background:#dcfce7;">
+                    <small class="text-uppercase text-success fw-bold">Correctas</small>
+                    <h3 class="fw-bold mb-0 text-success">{{ rutinas.correctas }}</h3>
+                    <small class="text-muted">{{ rutinas.pct }} %</small>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="p-3 rounded-4 border h-100" style="background:#fee2e2;">
+                    <small class="text-uppercase text-danger fw-bold">Incorrectas</small>
+                    <h3 class="fw-bold mb-0 text-danger">{{ rutinas.incorrectas }}</h3>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-info bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-balance-scale fa-2x text-info"></i>
-                </div>
-                <div>
-                    <small class="text-uppercase text-secondary fw-bold">Estabilidad Prom.</small>
-                    <h3 class="fw-bold mb-0 text-dark">{{ avg_stability }}%</h3>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-7">
+                <h6 class="fw-bold">% de repeticiones correctas por sesión</h6>
+                <div style="height: 260px;"><canvas id="routineChart"></canvas></div>
+            </div>
+            <div class="col-lg-5">
+                <h6 class="fw-bold">Acumulado por ejercicio</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr><th>Ejercicio</th><th class="text-center">Correctas</th><th class="text-center">Der.</th><th class="text-center">Izq.</th><th>Error más frecuente</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for e in rutinas.por_ejercicio %}
+                            <tr>
+                                <td class="fw-semibold">{{ e.nombre }}</td>
+                                <td class="text-center">{{ e.ok }}/{{ e.total }}{% if e.total %} <small class="text-muted">({{ e.pct }} %)</small>{% endif %}</td>
+                                <td class="text-center">{% if e.pct_der is not None %}{{ e.pct_der }} %{% else %}-{% endif %}</td>
+                                <td class="text-center">{% if e.pct_izq is not None %}{{ e.pct_izq }} %{% else %}-{% endif %}</td>
+                                <td><small>{{ e.error }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-trophy fa-2x text-success"></i>
-                </div>
-                <div>
-                    <small class="text-uppercase text-secondary fw-bold">Mejor Estabilidad</small>
-                    <h3 class="fw-bold mb-0 text-dark">{{ best_stability }}%</h3>
-                </div>
-            </div>
+
+        <h6 class="fw-bold">Historial de sesiones</h6>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border-top">
+                <thead class="table-light">
+                    <tr><th>Día</th><th>Fecha</th><th>Estado</th>{% for e in rutinas.por_ejercicio %}<th class="text-center">{{ e.nombre }}</th>{% endfor %}<th class="text-center">Total</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for s in rutinas.sesiones %}
+                    <tr>
+                        <td class="fw-bold text-secondary">{{ s.dia }}</td>
+                        <td>{{ s.fecha|date:"d/m/Y" }}</td>
+                        <td>
+                            {% if s.estado == 'COMPLETADA' %}<span class="badge rounded-pill bg-success">Completa</span>
+                            {% else %}<span class="badge rounded-pill bg-warning text-dark">Incompleta</span>{% endif %}
+                        </td>
+                        {% for e in rutinas.por_ejercicio %}
+                        <td class="text-center">
+                            {% for x in s.ejercicios %}{% if x.nombre == e.nombre %}
+                                <span class="fw-semibold">{{ x.ok }}/{{ x.total }}</span>
+                                {% if x.error %}<br><small class="text-danger">{{ x.error }}</small>{% endif %}
+                            {% endif %}{% endfor %}
+                        </td>
+                        {% endfor %}
+                        <td class="text-center fw-bold">{{ s.ok }}/{{ s.total }}<br><small class="text-muted">{{ s.pct }} %</small></td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#reps-{{ s.id }}">Ver detalle</button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="reps-{{ s.id }}">
+                        <td colspan="20" class="bg-light">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>#</th><th>Hora</th><th>Ejercicio</th><th>Pierna</th><th>Resultado</th><th>% del tiempo mal</th><th>Error principal</th></tr></thead>
+                                <tbody>
+                                    {% for r in s.repeticiones %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ r.hora|date:"H:i:s" }}</td>
+                                        <td>{{ r.ejercicio }}</td>
+                                        <td>{{ r.pierna }}</td>
+                                        <td>{% if r.resultado == 'OK' %}<span class="text-success fw-bold">Correcta</span>{% else %}<span class="text-danger fw-bold">Incorrecta</span>{% endif %}</td>
+                                        <td>{{ r.pct_incorrecto|floatformat:1 }} %</td>
+                                        <td>{{ r.error }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card border-0 shadow-sm rounded-4 h-100 metric-card" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-warning bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-arrows-alt-h fa-2x text-warning"></i>
-                </div>
-                <div>
-                    <small class="text-uppercase text-secondary fw-bold">Desviación Prom.</small>
-                    <h3 class="fw-bold mb-0 text-dark">{{ avg_deviation }} cm</h3>
-                </div>
-            </div>
+        {% else %}
+        <div class="alert alert-info border-0 rounded-3 mb-0">
+            <i class="fas fa-info-circle me-2"></i> Aún no hay rutinas registradas. Los resultados aparecerán aquí al terminar cada repetición.
         </div>
+        {% endif %}
     </div>
 </div>
 
-<div class="row g-4 mb-4">
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.95);">
-            <div class="card-body p-4">
-                <h5 class="fw-bold mb-4"><i class="fas fa-chart-area me-2 text-primary"></i> Tendencia de Progreso</h5>
-                <div style="height: 300px;">
-                    <canvas id="trendChart"></canvas>
-                </div>
-            </div>
+<!-- ===================== EVALUACIÓN DE ROMBERG ===================== -->
+<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-1"><i class="fas fa-stethoscope me-2 text-primary"></i> Evaluación de Romberg</h5>
+        <p class="text-muted small mb-4">Balanceo lateral medido con la cámara (30 s con ojos abiertos y 30 s con ojos cerrados). Es una referencia: la inicial, antes de la primera rutina, y la final, al terminar, para comparar.</p>
+        {% if romberg_tests %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border-top">
+                <thead class="table-light">
+                    <tr><th>Fecha</th><th>Tipo</th><th class="text-center">Ojos abiertos</th><th class="text-center">Ojos cerrados</th><th>Nota del doctor</th></tr>
+                </thead>
+                <tbody>
+                    {% for t in romberg_tests %}
+                    <tr>
+                        <td>{{ t.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ t.get_evaluation_type_display }}{% if not t.valid %} <span class="badge rounded-pill bg-warning text-dark">Repetida: la cámara no vio bien</span>{% endif %}</td>
+                        <td class="text-center">{% if t.sway_open_cm is not None %}{{ t.sway_open_cm }} cm<br><small class="text-muted">{{ t.side_open }}</small>{% else %}-{% endif %}</td>
+                        <td class="text-center">{% if t.sway_closed_cm is not None %}{{ t.sway_closed_cm }} cm<br><small class="text-muted">{{ t.side_closed }}</small>{% else %}-{% endif %}</td>
+                        <td><small class="text-muted">{{ t.doctor_note|default:"-" }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.95);">
-            <div class="card-body p-4">
-                <h5 class="fw-bold mb-4"><i class="fas fa-dumbbell me-2 text-info"></i> Sesiones por Ejercicio</h5>
-                <div style="height: 300px;">
-                    <canvas id="exerciseChart"></canvas>
-                </div>
-            </div>
+        {% if romberg.cambio_cerrados is not None %}
+        <p class="mb-0">Cambio del balanceo entre la evaluación inicial y la final: <strong>{{ romberg.cambio_abiertos }} cm</strong> con ojos abiertos y <strong>{{ romberg.cambio_cerrados }} cm</strong> con ojos cerrados <small class="text-muted">(negativo = menos balanceo)</small>.</p>
+        {% endif %}
+        {% else %}
+        <div class="alert alert-info border-0 rounded-3 mb-0">
+            <i class="fas fa-info-circle me-2"></i> Aún no se hizo la evaluación inicial de Romberg.
         </div>
+        {% endif %}
     </div>
 </div>
 
@@ -131,167 +213,32 @@
     </div>
 </div>
 
-<!-- Historial Detallado de Sesiones -->
-<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
-    <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h5 class="fw-bold mb-0"><i class="fas fa-list-alt me-2 text-secondary"></i> Historial Detallado de Ejercicios</h5>
-            <span class="badge rounded-pill {% if improvement_total >= 0 %}bg-success{% else %}bg-danger{% endif %} px-3 py-2 fs-6">
-                Cambio Histórico: {{ improvement_total }}%
-            </span>
-        </div>
-
-        {% if session_rows %}
-            <div class="table-responsive">
-                <table class="table table-hover align-middle border-top">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="py-3">N° Sesión</th>
-                            <th class="py-3">Fecha</th>
-                            <th class="py-3">Ejercicio</th>
-                            <th class="py-3">Estabilidad</th>
-                            <th class="py-3">Desviación</th>
-                            <th class="py-3">Calidad</th>
-                            <th class="py-3">Mejora vs Previa</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in session_rows reversed %}
-                        <tr>
-                            <td class="fw-bold text-secondary">#{{ row.session_number }}</td>
-                            <td>{{ row.timestamp }}</td>
-                            <td class="fw-semibold">{{ row.test_type }}</td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="progress flex-grow-1" style="height: 8px;">
-                                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ row.stability }}%;"></div>
-                                    </div>
-                                    <span style="min-width: 45px;">{{ row.stability }}%</span>
-                                </div>
-                            </td>
-                            <td>{{ row.deviation_cm }} cm</td>
-                            <td>
-                                <span class="badge rounded-pill {% if row.quality_semaphore == 'Alta' %}bg-success{% elif row.quality_semaphore == 'Media' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
-                                    {{ row.quality_score }}% {{ row.quality_semaphore }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if row.delta_stability is None %}
-                                    <span class="text-muted small"><i class="fas fa-minus me-1"></i> Base inicial</span>
-                                {% elif row.delta_stability >= 0 %}
-                                    <span class="text-success fw-bold"><i class="fas fa-arrow-up me-1"></i> +{{ row.delta_stability }}%</span>
-                                {% else %}
-                                    <span class="text-danger fw-bold"><i class="fas fa-arrow-down me-1"></i> {{ row.delta_stability }}%</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="alert alert-info border-0 rounded-3 mb-0">
-                <i class="fas fa-info-circle me-2"></i> Aún no hay sesiones registradas.
-            </div>
-        {% endif %}
-    </div>
-</div>
-
-<style>
-    .metric-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .metric-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
-    }
-</style>
-
-{{ chart_data|json_script:"progress-chart-data" }}
+{{ rutina_grafico|json_script:"routine-chart-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const chartNode = document.getElementById('progress-chart-data');
-        if (!chartNode || typeof Chart === 'undefined') return;
-
-        const payload = JSON.parse(chartNode.textContent);
-        if (!payload.labels || payload.labels.length === 0) return;
-
-        const trendCtx = document.getElementById('trendChart');
-        const exerciseCtx = document.getElementById('exerciseChart');
-
-        if (trendCtx) {
-            new Chart(trendCtx, {
+        // Gráfico de la rutina diaria: % de repeticiones correctas por sesión (total y por ejercicio)
+        const routineNode = document.getElementById('routine-chart-data');
+        const routineCtx = document.getElementById('routineChart');
+        if (routineNode && routineCtx && typeof Chart !== 'undefined') {
+            const r = JSON.parse(routineNode.textContent);
+            const colores = ['#0ea5e9', '#f59e0b', '#8b5cf6'];
+            new Chart(routineCtx, {
                 type: 'line',
                 data: {
-                    labels: payload.labels,
-                    datasets: [
-                        {
-                            label: 'Estabilidad %',
-                            data: payload.stability,
-                            borderColor: '#0ea5e9',
-                            backgroundColor: 'rgba(14,165,233,0.1)',
-                            borderWidth: 3,
-                            tension: 0.4,
-                            fill: true,
-                            pointBackgroundColor: '#fff',
-                            pointBorderColor: '#0ea5e9',
-                            pointBorderWidth: 2,
-                            pointRadius: 4
-                        },
-                        {
-                            label: 'Desviación cm',
-                            data: payload.deviation,
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'transparent',
-                            borderWidth: 3,
-                            borderDash: [5, 5],
-                            tension: 0.4,
-                            yAxisID: 'y1',
-                            pointBackgroundColor: '#fff',
-                            pointBorderColor: '#f59e0b',
-                            pointBorderWidth: 2,
-                            pointRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: { backgroundColor: 'rgba(15, 23, 34, 0.9)', padding: 12, cornerRadius: 8 }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
-                        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        if (exerciseCtx) {
-            new Chart(exerciseCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: payload.exerciseLabels,
+                    labels: r.labels,
                     datasets: [{
-                        data: payload.exerciseSessions,
-                        backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'],
-                        borderWidth: 0,
-                        hoverOffset: 4
-                    }]
+                        label: 'Total', data: r.pct, borderColor: '#10b981',
+                        backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 3, tension: 0.3, fill: true
+                    }].concat(r.por_ejercicio.map((e, i) => ({
+                        label: e.nombre, data: e.datos, borderColor: colores[i % colores.length],
+                        borderWidth: 2, borderDash: [4, 4], tension: 0.3, spanGaps: true, fill: false
+                    })))
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: { backgroundColor: 'rgba(15, 23, 34, 0.9)', padding: 12 }
-                    },
-                    cutout: '70%'
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { min: 0, max: 100, ticks: { callback: (v) => v + ' %' } } },
+                    plugins: { legend: { position: 'bottom' } }
                 }
             });
         }

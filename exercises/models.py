@@ -65,7 +65,8 @@ class Profile(models.Model):
 # =============================================================================
 class ExerciseSession(models.Model):
     """
-    Guarda los resultados matemáticos obtenidos por el motor de visión artificial (MediaPipe).
+    Tabla antigua de resultados de la cámara. Ya no se llena: la evaluación de Romberg se guarda en
+    RombergTest y la rutina en DailySession / ExerciseRepetition. Se conserva por los datos existentes.
     """
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_sessions')
     test_type = models.CharField(max_length=100, default='Diagnóstico general', help_text="Ej: Marcha Tandem, Soporte Monopodal")
@@ -84,7 +85,11 @@ class ExerciseSession(models.Model):
 
 
 class Evaluation(models.Model):
-    """Resultado clínico de una evaluación basal o final por prueba."""
+    """
+    Evaluación basal o final por prueba (tabla antigua: ya no se crean registros; la evaluación de
+    Romberg se guarda en RombergTest). Sus listas EXERCISE_CHOICES y ROUTINE_EXERCISES se usan en
+    todo el sistema.
+    """
 
     TYPE_CHOICES = (
         ('INICIAL', 'Inicial'),
@@ -94,7 +99,11 @@ class Evaluation(models.Model):
         ('Equilibrio Estatico', 'Equilibrio Estático'),
         ('Soporte Monopodal', 'Soporte Monopodal'),
         ('Marcha Tandem', 'Marcha Tándem'),
+        ('Postura del Arbol', 'Postura del Árbol'),
     )
+    # Los tres ejercicios de la rutina diaria (tesis): tándem, apoyo unipodal y árbol.
+    # 'Equilibrio Estatico' queda solo para la evaluación (Romberg).
+    ROUTINE_EXERCISES = ('Marcha Tandem', 'Soporte Monopodal', 'Postura del Arbol')
 
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='evaluations')
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
@@ -112,6 +121,42 @@ class Evaluation(models.Model):
             )
         ]
         ordering = ['date']
+
+
+class RombergTest(models.Model):
+    """
+    Evaluación de Romberg medida con la cámara (vision/romberg.py; bitácora D39-D45).
+    Es una MEDICIÓN DE REFERENCIA, no decide si el paciente es apto (el doctor ya lo evaluó):
+    INICIAL, obligatoria antes de la primera rutina, y FINAL, opcional al terminar, para comparar.
+    Dos fases de 30 s (ojos abiertos y ojos cerrados). Si la cámara no vio bien al paciente
+    (valid = False), se puede repetir.
+    """
+
+    TYPE_CHOICES = (('INICIAL', 'Inicial'), ('FINAL', 'Final'))
+
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='romberg_tests')
+    evaluation_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='INICIAL')
+    created_at = models.DateTimeField(auto_now_add=True)
+    valid = models.BooleanField(default=False, help_text="Las dos fases se midieron bien")
+    # Medidas de cada fase (amplitud, lado, inclinación, velocidad, tronco, fotogramas útiles...)
+    open_eyes = models.JSONField(default=dict, help_text="Medidas con ojos abiertos")
+    closed_eyes = models.JSONField(default=dict, help_text="Medidas con ojos cerrados")
+    sway_open_cm = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    sway_closed_cm = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    side_open = models.CharField(max_length=10, blank=True, default='')
+    side_closed = models.CharField(max_length=10, blank=True, default='')
+    romberg_ratio = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
+                                        help_text="Balanceo con ojos cerrados / con ojos abiertos")
+    # Puntos de referencia: por fotograma, tiempo (ms) y x, y de 7 puntos (nariz, hombros, caderas, tobillos)
+    reference_points = models.JSONField(default=dict)
+    # Nota del doctor
+    doctor_note = models.CharField(max_length=300, blank=True, default='')
+    noted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='romberg_notes')
+    noted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
 
 class DailySession(models.Model):
@@ -160,7 +205,7 @@ class SessionExerciseDetail(models.Model):
 
 
 class ExerciseRepetition(models.Model):
-    """Evento inmutable emitido al terminar cada repetición de 30 segundos."""
+    """Evento inmutable emitido al terminar cada repetición (20 s en la rutina diaria: 6 por ejercicio)."""
 
     RESULT_CHOICES = (('OK', 'Correcta'), ('NOK', 'Incorrecta'))
     detail = models.ForeignKey(
@@ -172,6 +217,15 @@ class ExerciseRepetition(models.Model):
     duration_sec = models.PositiveSmallIntegerField(default=30)
     stability_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     deviation_cm = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    # Resultado del clasificador de postura (modelo entrenado, 26-oct-2026)
+    side = models.CharField(max_length=3, blank=True, default='', help_text="Pierna que trabaja: der / izq")
+    model_windows = models.PositiveIntegerField(default=0, help_text="Ventanas de 1 s analizadas")
+    model_incorrect_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0,
+                                              help_text="% de ventanas clasificadas como incorrectas")
+    main_error = models.CharField(max_length=40, blank=True, default='', help_text="Error más frecuente")
+    latency_ms = models.DecimalField(max_digits=8, decimal_places=2, default=0,
+                                     help_text="Latencia media de la respuesta del modelo (ms)")
+    fps = models.DecimalField(max_digits=6, decimal_places=2, default=0, help_text="Fotogramas por segundo")
     created_at = models.DateTimeField(auto_now_add=True)
 
 

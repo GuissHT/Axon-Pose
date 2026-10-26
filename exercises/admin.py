@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Profile, ExerciseSession, Question, PatientAnswer, DoctorAdvice, Appointment
+from .models import Profile, ExerciseSession, Question, PatientAnswer, DoctorAdvice, Appointment, RombergTest
 
 # =============================================================================
 # CONFIGURACIÓN DEL PANEL DE ADMINISTRACIÓN (DJANGO ADMIN)
@@ -35,10 +35,18 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(ExerciseSession)
 class SessionAdmin(admin.ModelAdmin):
-    """Administración de las sesiones capturadas con la cámara."""
+    """Sesiones antiguas de la cámara (tabla que ya no se llena; se conserva por sus datos)."""
     list_display = ('patient', 'test_type', 'stability', 'created_at')
     list_filter = ('test_type', 'created_at')
     search_fields = ('patient__username', 'test_type')
+
+@admin.register(RombergTest)
+class RombergTestAdmin(admin.ModelAdmin):
+    """Evaluaciones de Romberg (medición de referencia inicial y final)."""
+    list_display = ('patient', 'evaluation_type', 'created_at', 'valid', 'sway_open_cm', 'sway_closed_cm')
+    list_filter = ('evaluation_type', 'valid')
+    search_fields = ('patient__username',)
+    exclude = ('reference_points',)  # miles de números: no se muestran en el formulario
 
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):

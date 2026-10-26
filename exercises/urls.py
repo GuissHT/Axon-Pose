@@ -49,7 +49,8 @@ urlpatterns = [
     path('reportes/descargar-pdf/', views.descargar_reporte_pdf, name='descargar_reporte_pdf'),
 
     # --- API para recepción de datos en tiempo real (Desde camera.js) ---
-    path('api/registrar-metricas/', views.registrar_metricas, name='registrar_metricas'),
+    path('api/romberg/', views.registrar_romberg, name='registrar_romberg'),
+    path('doctor/romberg/<int:test_id>/nota/', views.nota_romberg, name='nota_romberg'),
     path('api/rutinas/<int:session_id>/repeticiones/', views.registrar_repeticion, name='registrar_repeticion'),
     path('api/rutinas/<int:session_id>/finalizar/', views.finalizar_rutina, name='finalizar_rutina'),
     path('api/analizar-pose/', views.analizar_pose, name='analizar_pose'),

@@ -1,9 +1,14 @@
 /*
-   Este archivo controla la evaluacion visual en diagnostico:
-   1) Enciende/apaga camara
-   2) Ejecuta MediaPipe Pose
-   3) Dibuja esqueleto en canvas
-   4) Calcula estabilidad y desviacion lateral
+   Cámara y MediaPipe Pose, compartido por dos páginas:
+
+   - Rutina diaria (rutina_diaria.html + rutina.js): en tándem, unipodal y árbol envía cada 0,5 s el
+     último segundo de puntos a /api/analizar-pose/, donde el clasificador decide si la postura es
+     correcta y devuelve el mensaje. Voz si el error se repite en 2 ventanas seguidas (máx. cada 4 s).
+   - Evaluación de Romberg (diagnostico.html): dos fases de 30 s (ojos abiertos y cerrados). Muestra el
+     balanceo en vivo, guarda 7 puntos por fotograma y al terminar los envía a /api/romberg/, que mide
+     el balanceo y lo guarda como referencia (inicial o final; no decide si el paciente es apto).
+
+   Nunca se envía ni se guarda video: solo coordenadas.
 */
 
 (function initAxonPoseCameraModule() {
@@ -21,16 +26,26 @@
     const progressBar = document.getElementById('testProgress');
     const phaseIndicator = document.getElementById('phaseIndicator');
     const phaseNotice = document.getElementById('phaseNotice');
-    const metricStability = document.getElementById('metricStability');
-    const metricDeviation = document.getElementById('metricDeviation');
+    const metricSway = document.getElementById('metricSway');
+    const metricSide = document.getElementById('metricSide');
     const metricAngle = document.getElementById('metricAngle');
+    const rombergResult = document.getElementById('rombergResult');
     const badgeCamera = document.getElementById('badgeCamera');
     const badgeAlignment = document.getElementById('badgeAlignment');
-    const testType = 'Equilibrio Estatico';
+    // La prueba activa la define la página (data-test-type en el video) o la rutina (rutina.js).
+    function getTestType() {
+        return videoElement.dataset.testType || 'Equilibrio Estatico';
+    }
+    function getSide() {
+        return videoElement.dataset.side === 'izq' ? 'izq' : 'der';
+    }
+    const MODEL_TESTS = new Set(['Marcha Tandem', 'Soporte Monopodal', 'Postura del Arbol']);
     const isRoutine = document.body.dataset.routine === 'true';
     const evaluationType = document.body.dataset.evaluationType || 'INICIAL';
 
-    const TEST_DURATION_SECONDS = 30;
+    // Duración de cada repetición: la rutina usa 20 s (data-duration-sec); la evaluación, 30 s por fase.
+    const TEST_DURATION_SECONDS = Number(videoElement.dataset.durationSec) || 30;
+    const DURATION_TEXT = `00:${String(TEST_DURATION_SECONDS).padStart(2, '0')}`;
     const TOTAL_PHASES = 2;
     let streamRef = null;
     let poseRef = null;
@@ -45,40 +60,69 @@
     let pythonAnalysisInFlight = false;
     let lastPythonAnalysisAt = 0;
     let lastAlertAt = 0;
-    const analysisWindow = [];
-    const MAX_WINDOW = 12;
-    const PYTHON_ANALYSIS_INTERVAL_MS = 500;
+    const PYTHON_ANALYSIS_INTERVAL_MS = 500;   // una decisión cada 0,5 s
     const ALERT_INTERVAL_MS = 1500;
+    const WINDOW_MS = 1000;                    // ventana de 1 s, igual que en el entrenamiento
+    const SPEECH_PERSISTENCE = 2;              // hablar solo si el error se repite en 2 ventanas seguidas
+    const SPEECH_MIN_INTERVAL_MS = 4000;       // y como máximo cada 4 s
+    const frameBuffer = [];                    // [{t, lm}] últimos fotogramas (solo coordenadas, sin video)
+    let consecutiveIncorrect = 0;
+    let lastSpeechAt = 0;
+    let modelStats = null;
+    // Comprobación de posición: en tándem, unipodal y árbol el conteo de 30 s empieza recién cuando
+    // el servidor confirma que la persona está en la postura (antes contaba con solo estar parada).
+    let postureReady = true;
+    // Romberg: los 7 puntos que usa vision/romberg.py (nariz, hombros, caderas, tobillos)
+    const ROMBERG_POINTS = [0, 11, 12, 23, 24, 27, 28];
+    const ROMBERG_LIVE_MS = 3000;              // balanceo en vivo: últimos 3 s
+    const rombergFrames = { 1: [], 2: [] };    // fase 1 = ojos abiertos, fase 2 = ojos cerrados
 
-    function getExerciseConfig(testType) {
-        const configs = {
-            'Equilibrio Estatico': {
-                verticalTolerance: 0.055,
-                trunkTolerance: 0.05,
-                stabilityThreshold: 84,
-                swayWeight: 0.2
-            },
-            'Soporte Monopodal': {
-                verticalTolerance: 0.075,
-                trunkTolerance: 0.07,
-                stabilityThreshold: 74,
-                swayWeight: 0.32
-            },
-            'Marcha Tandem': {
-                verticalTolerance: 0.068,
-                trunkTolerance: 0.06,
-                stabilityThreshold: 78,
-                swayWeight: 0.28
-            },
-            'Postura del Arbol': {
-                verticalTolerance: 0.06,
-                trunkTolerance: 0.05,
-                stabilityThreshold: 80,
-                swayWeight: 0.2
-            }
+    function resetModelStats(keepBuffer) {
+        modelStats = {
+            windows: 0, incorrect: 0, errors: {}, latencies: [], frames: 0,
+            startedAt: performance.now()
         };
+        if (!keepBuffer) frameBuffer.length = 0;
+        consecutiveIncorrect = 0;
+    }
+    resetModelStats();
 
-        return configs[testType] || configs['Marcha Tandem'];
+    // Se llama al empezar cada repetición o fase: los ejercicios del modelo esperan la postura.
+    function armPostureGate() {
+        postureReady = !MODEL_TESTS.has(getTestType());
+    }
+
+    function summarizeModelStats() {
+        if (!modelStats) return null;
+        const elapsed = (performance.now() - modelStats.startedAt) / 1000;
+        const lat = modelStats.latencies;
+        let mainError = '';
+        let best = 0;
+        Object.entries(modelStats.errors).forEach(([key, count]) => {
+            if (count > best) { best = count; mainError = key; }
+        });
+        return {
+            windows: modelStats.windows,
+            incorrectPct: modelStats.windows ? (100 * modelStats.incorrect / modelStats.windows) : 0,
+            mainError,
+            latencyMs: lat.length ? lat.reduce((a, b) => a + b, 0) / lat.length : 0,
+            fps: elapsed > 0 ? modelStats.frames / elapsed : 0
+        };
+    }
+
+    function speak(text, force) {
+        const now = performance.now();
+        if (!force && now - lastSpeechAt < SPEECH_MIN_INTERVAL_MS) return;
+        lastSpeechAt = now;
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'es-ES';
+            utterance.rate = 0.95;
+            window.speechSynthesis.speak(utterance);
+        } else {
+            playAlert();
+        }
     }
 
     function playAlert() {
@@ -121,54 +165,104 @@
         return '';
     }
 
+    // Lee la respuesta del servidor sin romperse si no es JSON (p. ej. una página de error HTML).
+    async function readJson(response) {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            return { ok: false, error: `Respuesta no válida del servidor (código ${response.status})` };
+        }
+    }
+
     function setAnalysisStatus(message, isError) {
         badgeAlignment.textContent = message;
         badgeAlignment.classList.toggle('warning', Boolean(isError));
         badgeAlignment.classList.toggle('success', !isError);
     }
 
-    async function guardarSesionEnBackend() {
-        if (isRoutine) {
-            return;
-        }
-        if (!latestAnalysis) {
-            return;
-        }
+    // Muestra el resultado de la evaluación de Romberg (los textos vienen del servidor como datos).
+    function showRombergResult(kind, title, lines) {
+        if (!rombergResult) return;
+        rombergResult.replaceChildren();
+        const box = document.createElement('div');
+        box.className = `alert alert-${kind} rounded-4 mb-0`;
+        const strong = document.createElement('strong');
+        strong.textContent = title;
+        box.appendChild(strong);
+        lines.forEach((text) => {
+            const div = document.createElement('div');
+            div.className = 'small mt-1';
+            div.textContent = text;
+            box.appendChild(div);
+        });
+        rombergResult.appendChild(box);
+    }
 
-        const payload = {
-            testType,
-            stability: latestAnalysis.estabilidad,
-            deviationCm: latestAnalysis.desviacionCm,
-            alignment: latestAnalysis.alineacionOptima ? 'Optima' : 'Requiere ajuste',
-            qualityScore: latestAnalysis.qualityScore,
-            evaluationType: evaluationType,
-            angleDeg: metricAngle
-                ? Number(metricAngle.textContent.replace('°', '')) || 0
-                : 0
-        };
+    function describePhase(name, phase) {
+        if (!phase || phase.amplitud_cm === null || phase.amplitud_cm === undefined) {
+            return `${name}: no se pudo medir.`;
+        }
+        const side = phase.lado && phase.lado !== 'centro' ? `, hacia la ${phase.lado}` : '';
+        return `${name}: balanceo de ${phase.amplitud_cm} cm${side} (${phase.pct_utiles} % de fotogramas útiles).`;
+    }
 
+    // Al terminar las dos fases se envían los puntos; el servidor calcula y guarda la sugerencia.
+    async function enviarRomberg() {
+        showRombergResult('info', 'Calculando el resultado...', []);
         try {
-            await fetch('/api/registrar-metricas/', {
+            const response = await fetch('/api/romberg/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({
+                    evaluationType,
+                    width: videoElement.videoWidth || canvasElement.width,
+                    height: videoElement.videoHeight || canvasElement.height,
+                    phases: { open: rombergFrames[1], closed: rombergFrames[2] }
+                })
             });
+            const result = await readJson(response);
+            if (!response.ok || !result.ok) {
+                throw new Error(result.error || 'No se pudo guardar la evaluación.');
+            }
+            if (!result.valid) {
+                showRombergResult('warning', 'Hay que repetir la evaluación', [
+                    'La cámara no vio bien a la persona en alguna fase (debe verse de la cabeza a los pies).',
+                    describePhase('Ojos abiertos', result.open),
+                    describePhase('Ojos cerrados', result.closed)
+                ]);
+                return;
+            }
+            showRombergResult('success', `Evaluación ${result.type.toLowerCase()} guardada`, [
+                describePhase('Ojos abiertos', result.open),
+                describePhase('Ojos cerrados', result.closed),
+                'Recargando la página...'
+            ]);
+            window.setTimeout(() => window.location.assign(window.location.pathname), 2500);
         } catch (error) {
-            console.warn('No se pudieron guardar metricas de sesion:', error);
+            showRombergResult('danger', 'No se guardó la evaluación', [error.message]);
         }
     }
 
-    async function analizarConPython(landmarks) {
+    async function analizarConPython() {
         const now = performance.now();
         if (pythonAnalysisInFlight || now - lastPythonAnalysisAt < PYTHON_ANALYSIS_INTERVAL_MS) {
             return;
         }
+        // Se espera a tener casi 1 s de fotogramas antes de la primera decisión.
+        if (!frameBuffer.length || now - frameBuffer[0].t < WINDOW_MS * 0.8) {
+            return;
+        }
+        const testType = getTestType();
+        // Romberg: se envían los últimos 3 s de la fase (7 puntos por fotograma); si no, el último segundo.
+        const phaseFrames = rombergFrames[currentPhase] || [];
+        const frames = MODEL_TESTS.has(testType)
+            ? frameBuffer.map((item) => item.lm)
+            : phaseFrames.filter((f) => now - f.t <= ROMBERG_LIVE_MS);
 
         pythonAnalysisInFlight = true;
         lastPythonAnalysisAt = now;
+        const sentAt = performance.now();
         try {
             const response = await fetch('/api/analizar-pose/', {
                 method: 'POST',
@@ -178,47 +272,90 @@
                 },
                 body: JSON.stringify({
                     testType,
-                    landmarks
+                    side: getSide(),
+                    // Si ya estaba en la postura, el servidor usa un umbral más tolerante (histéresis).
+                    inPosture: postureReady,
+                    width: videoElement.videoWidth || canvasElement.width,
+                    height: videoElement.videoHeight || canvasElement.height,
+                    frames
                 })
             });
-            const result = await response.json();
+            const result = await readJson(response);
+            const latency = performance.now() - sentAt;
             if (!response.ok || !result.ok) {
                 throw new Error(result.error || 'El analizador no pudo procesar la pose.');
             }
 
-            latestAnalysis = {
-                estabilidad: Number(result.stability).toFixed(1),
-                desviacionCm: Number(result.deviation_cm).toFixed(2),
-                alineacionOptima: result.alignment === 'Optima',
-                qualityScore: latestAnalysis ? latestAnalysis.qualityScore : '0.0'
-            };
-            videoElement.dispatchEvent(new CustomEvent('axon:pose-analysis', {
-                detail: latestAnalysis
-            }));
-            const angleValues = Object.values(result.angles || {});
-            if (metricAngle) {
-                metricAngle.textContent = angleValues.length
-                    ? `${Number(angleValues[0]).toFixed(1)}°`
-                    : '--';
+            if (MODEL_TESTS.has(testType)) {
+                handleModelResult(result, latency);
+                return;
             }
-            if (metricStability) {
-                metricStability.textContent = `${latestAnalysis.estabilidad}%`;
+
+            // Romberg en vivo: solo se muestra; el resultado se calcula al final con las dos fases.
+            if (!result.valido) {
+                setAnalysisStatus(result.message || 'Colóquese de cuerpo entero frente a la cámara', true);
+                return;
             }
-            if (metricDeviation) {
-                metricDeviation.textContent = `${latestAnalysis.desviacionCm} cm`;
-            }
-            badgeAlignment.textContent = result.message;
-            badgeAlignment.classList.toggle('success', !result.alert);
-            badgeAlignment.classList.toggle('warning', result.alert);
-            if (result.alert) {
-                playAlert();
-            }
+            if (metricSway) metricSway.textContent = `${result.amplitud_cm} cm`;
+            if (metricSide) metricSide.textContent = result.lado || '--';
+            if (metricAngle) metricAngle.textContent = `${Number(result.tronco_g).toFixed(1)}°`;
+            setAnalysisStatus(result.message, false);
         } catch (error) {
             setAnalysisStatus(`Error del modelo: ${error.message}`, true);
             console.warn('No se pudo ejecutar el modelo Python:', error);
         } finally {
             pythonAnalysisInFlight = false;
         }
+    }
+
+    function handleModelResult(result, latency) {
+        if (!result.valido) {
+            setAnalysisStatus(result.mensaje || 'Colóquese frente a la cámara', true);
+            return;
+        }
+        if (result.posicion) {
+            console.debug('[Axon] posición', result.en_posicion, JSON.stringify(result.posicion));
+        }
+        if (!postureReady) {
+            if (!result.en_posicion) {
+                // Todavía no está en la postura: se indica cómo colocarse y el reloj no corre.
+                consecutiveIncorrect += 1;
+                setAnalysisStatus(`Para empezar: ${result.mensaje}`, true);
+                if (consecutiveIncorrect >= SPEECH_PERSISTENCE) speak(result.mensaje);
+                return;
+            }
+            postureReady = true;
+            evaluationStartedAt = performance.now();
+            resetModelStats(true);
+            videoElement.dispatchEvent(new CustomEvent('axon:posture-ready'));
+            speak('Posición correcta. Empezamos', true);
+        }
+        if (modelStats && workActive) {
+            modelStats.windows += 1;
+            modelStats.latencies.push(latency);
+            if (result.incorrecto) {
+                modelStats.incorrect += 1;
+                if (result.error) {
+                    modelStats.errors[result.error] = (modelStats.errors[result.error] || 0) + 1;
+                }
+            }
+        }
+        consecutiveIncorrect = result.incorrecto ? consecutiveIncorrect + 1 : 0;
+        setAnalysisStatus(result.mensaje, result.incorrecto);
+        if (metricAngle && result.medidas) {
+            metricAngle.textContent = `${Number(result.medidas.tronco_lateral_g).toFixed(1)}°`;
+        }
+        if (consecutiveIncorrect >= SPEECH_PERSISTENCE) {
+            speak(result.mensaje);
+        }
+        const summary = summarizeModelStats();
+        latestAnalysis = {
+            estabilidad: summary ? (100 - summary.incorrectPct).toFixed(1) : '0.0',
+            desviacionCm: '0.00',
+            alineacionOptima: !result.incorrecto,
+            modelo: summary
+        };
+        videoElement.dispatchEvent(new CustomEvent('axon:pose-analysis', { detail: latestAnalysis }));
     }
 
     function setCameraBadge(active) {
@@ -238,6 +375,9 @@
         if (timerLabel) {
             timerLabel.textContent = remainingText;
         }
+        videoElement.dispatchEvent(new CustomEvent('axon:tick', {
+            detail: { remaining, total: TEST_DURATION_SECONDS }
+        }));
     }
 
     function updatePhaseUI() {
@@ -260,7 +400,7 @@
             progressBar.style.width = '0%';
         }
         if (timerLabel) {
-            timerLabel.textContent = '00:30';
+            timerLabel.textContent = DURATION_TEXT;
         }
         updatePhaseUI();
         if (phaseNotice) {
@@ -298,68 +438,17 @@
         });
     }
 
-    // Funcion preparada para usar landmarks y producir metricas de verticalidad.
-    function analizarEquilibrio(landmarks) {
-        const leftShoulder = landmarks[11];
-        const rightShoulder = landmarks[12];
-        const leftHip = landmarks[23];
-        const rightHip = landmarks[24];
-        const leftAnkle = landmarks[27];
-        const rightAnkle = landmarks[28];
-
-        const visibilityValues = [
-            leftShoulder.visibility,
-            rightShoulder.visibility,
-            leftHip.visibility,
-            rightHip.visibility,
-            leftAnkle.visibility,
-            rightAnkle.visibility
-        ].map((value) => (typeof value === 'number' ? value : 1));
-
-        const minVisibility = Math.min(...visibilityValues);
-        if (minVisibility < 0.45) {
-            return null;
+    // Cualquier error al dibujar o analizar un fotograma se registra, pero no detiene la cámara.
+    function onPoseResults(results) {
+        try {
+            onPoseResultsInner(results);
+        } catch (error) {
+            console.warn('Error al procesar el fotograma:', error);
+            try { ctx.restore(); } catch (e) { /* nada */ }
         }
-
-        const centerShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
-        const centerHipX = (leftHip.x + rightHip.x) / 2;
-        const centerAnkleX = (leftAnkle.x + rightAnkle.x) / 2;
-        const ankleDistance = Math.abs(leftAnkle.x - rightAnkle.x);
-
-        const cfg = getExerciseConfig(testType);
-
-        const verticalError = Math.abs(centerShoulderX - centerAnkleX);
-        const trunkError = Math.abs(centerShoulderX - centerHipX);
-        const verticalNorm = Math.min(verticalError / cfg.verticalTolerance, 1);
-        const trunkNorm = Math.min(trunkError / cfg.trunkTolerance, 1);
-        const swayNorm = Math.min(Math.abs(ankleDistance - 0.16) / 0.16, 1);
-
-        const combinedNorm = (verticalNorm * 0.45) + (trunkNorm * 0.35) + (swayNorm * cfg.swayWeight);
-
-        const rawStability = Math.max(0, 100 - (combinedNorm * 100));
-        const rawDeviationCm = (verticalError + trunkError) * 100 * 0.22;
-
-        analysisWindow.push({
-            stability: rawStability,
-            deviationCm: rawDeviationCm,
-        });
-        if (analysisWindow.length > MAX_WINDOW) {
-            analysisWindow.shift();
-        }
-
-        const smoothedStability = analysisWindow.reduce((acc, item) => acc + item.stability, 0) / analysisWindow.length;
-        const smoothedDeviation = analysisWindow.reduce((acc, item) => acc + item.deviationCm, 0) / analysisWindow.length;
-        const qualityScore = Math.max(0, Math.min(100, minVisibility * 100));
-
-        return {
-            estabilidad: smoothedStability.toFixed(1),
-            desviacionCm: smoothedDeviation.toFixed(2),
-            alineacionOptima: smoothedStability >= cfg.stabilityThreshold,
-            qualityScore: qualityScore.toFixed(1)
-        };
     }
 
-    function onPoseResults(results) {
+    function onPoseResultsInner(results) {
         ctx.save();
         ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         ctx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
@@ -371,33 +460,37 @@
                 return;
             }
             drawSkeleton(results.poseLandmarks);
-            const analisis = analizarEquilibrio(results.poseLandmarks);
-            if (!analisis) {
-                badgeAlignment.textContent = 'Ajustar posicion frente a camara';
-                badgeAlignment.classList.remove('success');
-                badgeAlignment.classList.add('warning');
+            const frameTime = performance.now();
+            frameBuffer.push({
+                t: frameTime,
+                lm: results.poseLandmarks.map((p) => [
+                    Number(p.x.toFixed(5)), Number(p.y.toFixed(5)), Number((p.z || 0).toFixed(5)),
+                    Number((typeof p.visibility === 'number' ? p.visibility : 1).toFixed(3))
+                ])
+            });
+            while (frameBuffer.length && frameTime - frameBuffer[0].t > WINDOW_MS) {
+                frameBuffer.shift();
+            }
+            if (modelStats && workActive) {
+                modelStats.frames += 1;
+            }
+            if (MODEL_TESTS.has(getTestType())) {
+                analizarConPython();
                 ctx.restore();
                 return;
             }
-            latestAnalysis = analisis;
-            videoElement.dispatchEvent(new CustomEvent('axon:pose-analysis', {
-                detail: analisis
-            }));
-
-            if (metricStability) {
-                metricStability.textContent = `${analisis.estabilidad}%`;
+            // Romberg: se guardan los 7 puntos de cada fotograma de la fase en curso.
+            if (workActive && rombergFrames[currentPhase]) {
+                rombergFrames[currentPhase].push({
+                    t: frameTime,
+                    p: ROMBERG_POINTS.map((i) => {
+                        const q = results.poseLandmarks[i];
+                        return [Number(q.x.toFixed(4)), Number(q.y.toFixed(4)),
+                            Number((typeof q.visibility === 'number' ? q.visibility : 1).toFixed(2))];
+                    })
+                });
             }
-            if (metricDeviation) {
-                metricDeviation.textContent = `${analisis.desviacionCm} cm`;
-            }
-
-            badgeAlignment.textContent = analisis.alineacionOptima ? 'Alineacion optima' : 'Ajustar alineacion';
-            badgeAlignment.classList.toggle('success', analisis.alineacionOptima);
-            badgeAlignment.classList.toggle('warning', !analisis.alineacionOptima);
-            setAnalysisStatus('Modelo activo: analizando postura', false);
-            if (!isRoutine) {
-                analizarConPython(results.poseLandmarks);
-            }
+            analizarConPython();
         }
 
         ctx.restore();
@@ -410,12 +503,16 @@
 
         frameInFlight = true;
         try {
-            await poseRef.send({ image: videoElement });
+            // Si MediaPipe no responde en 3 s, se suelta el fotograma para que la cámara no quede congelada.
+            await Promise.race([
+                poseRef.send({ image: videoElement }),
+                new Promise((resolve) => window.setTimeout(resolve, 3000))
+            ]);
         } catch (error) {
+            // Antes aquí se salía del ciclo y la imagen quedaba congelada para siempre.
             if (isRunning) {
                 console.warn('No se pudo procesar un fotograma:', error);
             }
-            return;
         } finally {
             frameInFlight = false;
         }
@@ -424,6 +521,12 @@
             return;
         }
 
+        if (!postureReady) {
+            // Esperando la postura: el reloj se queda en la duración completa.
+            updateProgressUI(0);
+            animationRef = window.requestAnimationFrame(processFrameLoop);
+            return;
+        }
         const elapsedSeconds = (performance.now() - evaluationStartedAt) / 1000;
         updateProgressUI(elapsedSeconds);
 
@@ -431,13 +534,12 @@
             if (isRoutine) {
                 pauseRoutineWork();
                 resetProgressUI();
-                videoElement.dispatchEvent(new CustomEvent('axon:work-complete', {
-                    detail: latestAnalysis
-                }));
+                const detail = Object.assign({}, latestAnalysis || {}, { modelo: summarizeModelStats() });
+                videoElement.dispatchEvent(new CustomEvent('axon:work-complete', { detail }));
             } else if (currentPhase === 1) {
                 completeOpenEyesPhase();
             } else {
-                stopEvaluation();
+                finishRomberg();
             }
             return;
         }
@@ -460,13 +562,21 @@
         setAnalysisStatus('Listo para iniciar ojos cerrados.', false);
     }
 
+    // Fin de la fase 2: se apaga la cámara y se envían las dos fases para calcular el resultado.
+    async function finishRomberg() {
+        await stopEvaluation(true);
+        await enviarRomberg();
+    }
+
     function startClosedEyesPhase() {
         currentPhase = 2;
         workActive = true;
         evaluationStartedAt = performance.now();
         latestAnalysis = null;
-        analysisWindow.length = 0;
+        rombergFrames[2] = [];
         lastPythonAnalysisAt = 0;
+        resetModelStats();
+        armPostureGate();
         updatePhaseUI();
         if (phaseNotice) {
             phaseNotice.textContent = 'Fase 2 iniciada. Mantenga los ojos cerrados durante 30 segundos.';
@@ -525,9 +635,12 @@
             currentPhase = 1;
             evaluationStartedAt = performance.now();
             latestAnalysis = null;
-            analysisWindow.length = 0;
+            rombergFrames[1] = [];
+            rombergFrames[2] = [];
             lastPythonAnalysisAt = 0;
             lastAlertAt = 0;
+            resetModelStats();
+            armPostureGate();
             setCameraBadge(true);
             setAnalysisStatus('Buscando cuerpo...', false);
             btnStart.disabled = true;
@@ -549,7 +662,9 @@
         }
     }
 
-    async function stopEvaluation() {
+    // completed = true solo cuando terminan las dos fases del Romberg; con "Detener" no se guarda nada.
+    async function stopEvaluation(completed) {
+        const wasRomberg = !isRoutine && isRunning;
         isRunning = false;
         workActive = false;
 
@@ -578,7 +693,7 @@
         }
 
         setCameraBadge(false);
-        badgeAlignment.textContent = 'Alineacion en espera';
+        badgeAlignment.textContent = 'En espera';
         badgeAlignment.classList.remove('warning');
         badgeAlignment.classList.add('success');
         if (!isRoutine) {
@@ -587,9 +702,8 @@
         btnStop.disabled = true;
         currentPhase = 1;
         resetProgressUI();
-
-        if (!isRoutine) {
-            await guardarSesionEnBackend();
+        if (wasRomberg && completed !== true) {
+            showRombergResult('warning', 'Evaluación detenida', ['No se guardó. Puede volver a empezar.']);
         }
     }
 
@@ -611,15 +725,16 @@
         workActive = true;
         evaluationStartedAt = performance.now();
         latestAnalysis = null;
-        analysisWindow.length = 0;
         lastPythonAnalysisAt = 0;
+        resetModelStats();
+        armPostureGate();
         setAnalysisStatus('Buscando cuerpo...', false);
         processFrameLoop();
     }
 
     videoElement.addEventListener('axon:pause-work', pauseRoutineWork);
     videoElement.addEventListener('axon:resume-work', resumeRoutineWork);
-    videoElement.addEventListener('axon:end-routine', stopEvaluation);
+    videoElement.addEventListener('axon:end-routine', () => stopEvaluation(false));
     videoElement.addEventListener('axon:start-failed', () => {
         isRunning = false;
         workActive = false;
@@ -628,5 +743,5 @@
     if (!isRoutine) {
         btnStart.addEventListener('click', startEvaluation);
     }
-    btnStop.addEventListener('click', stopEvaluation);
+    btnStop.addEventListener('click', () => stopEvaluation(false));
 })();
