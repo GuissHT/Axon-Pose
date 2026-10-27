@@ -12,18 +12,36 @@
         toggle.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú');
     };
 
-    setCollapsed(window.localStorage.getItem('axon-sidebar-collapsed') === 'true');
+    // En pantallas angostas (celular) el menú siempre empieza cerrado para no tapar el contenido;
+    // en computadora se respeta lo último que eligió la persona.
+    let saved = null;
+    try {
+        saved = window.localStorage.getItem('axon-sidebar-collapsed');
+    } catch (error) {
+        saved = null;
+    }
+    setCollapsed(window.matchMedia('(max-width: 768px)').matches || saved === 'true');
 
     toggle.addEventListener('click', () => {
         const collapsed = !layout.classList.contains('is-sidebar-collapsed');
         setCollapsed(collapsed);
-        window.localStorage.setItem('axon-sidebar-collapsed', String(collapsed));
+        try { window.localStorage.setItem('axon-sidebar-collapsed', String(collapsed)); } catch (error) { /* sin almacenamiento */ }
     });
+
+    // En celular, tocar el contenido cierra el menú abierto (sin guardar la preferencia).
+    const main = document.getElementById('main-content');
+    if (main) {
+        main.addEventListener('click', () => {
+            if (window.matchMedia('(max-width: 992px)').matches && !layout.classList.contains('is-sidebar-collapsed')) {
+                setCollapsed(true);
+            }
+        });
+    }
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             setCollapsed(true);
-            window.localStorage.setItem('axon-sidebar-collapsed', 'true');
+            try { window.localStorage.setItem('axon-sidebar-collapsed', 'true'); } catch (error) { /* sin almacenamiento */ }
         }
     });
 })();

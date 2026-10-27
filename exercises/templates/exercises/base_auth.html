@@ -59,6 +59,10 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* Botón "ojito" para ver la contraseña (password-toggle.js) */
+        .password-field .form-control { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+        .password-toggle { border: 1px solid #dee2e6; border-left: 0; background: #fff; color: #64748b; border-radius: 0 .5rem .5rem 0 !important; padding: 0 1rem; }
+        .password-toggle:hover, .password-toggle:focus-visible { background: #f1f5f9; color: #1f5d88; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -85,6 +89,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'exercises/js/password-toggle.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

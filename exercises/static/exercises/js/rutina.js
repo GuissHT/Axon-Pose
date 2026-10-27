@@ -5,11 +5,28 @@
     if (!video || !startButton || !stopButton) return;
 
     // Los tres ejercicios de la tesis. 'Equilibrio Estatico' (Romberg) es solo evaluación.
-    const exercises = [
-        { value: 'Marcha Tandem', label: 'Posición en tándem' },
-        { value: 'Soporte Monopodal', label: 'Apoyo unipodal' },
-        { value: 'Postura del Arbol', label: 'Postura del árbol' }
+    const allExercises = [
+        { key: 'tandem', value: 'Marcha Tandem', label: 'Posición en tándem', short: 'Tándem' },
+        { key: 'unipodal', value: 'Soporte Monopodal', label: 'Apoyo unipodal', short: 'Unipodal' },
+        { key: 'arbol', value: 'Postura del Arbol', label: 'Postura del árbol', short: 'Árbol' }
     ];
+    // La rutina empieza por el ejercicio desde el que se entró (?ejercicio=unipodal) y sigue con los
+    // otros dos, para que la sesión del día tenga siempre los tres ejercicios.
+    const requested = new URLSearchParams(window.location.search).get('ejercicio');
+    const firstIndex = Math.max(allExercises.findIndex((e) => e.key === requested), 0);
+    const exercises = allExercises.slice(firstIndex).concat(allExercises.slice(0, firstIndex));
+    const stepsList = document.getElementById('routineSteps');
+
+    function renderSteps(current) {
+        if (!stepsList) return;
+        stepsList.replaceChildren(...exercises.map((e, i) => {
+            const li = document.createElement('li');
+            li.textContent = `${i + 1}. ${e.short}`;
+            if (i < current) li.className = 'done';
+            else if (i === current) li.className = 'active';
+            return li;
+        }));
+    }
     // 6 repeticiones de 20 s por ejercicio: 3 con cada pierna, alternando (der, izq, der, izq, der, izq).
     const repetitionsPerExercise = 6;
     const WORK_SECONDS = Number(video.dataset.durationSec) || 20;
@@ -38,6 +55,7 @@
     const label = document.getElementById('exerciseLabel');
     const select = document.getElementById('testTypeSelect');
     const progress = document.getElementById('routineProgress');
+    updateHeaderInitial();
 
     // Lee la respuesta sin romperse si el servidor devuelve HTML en lugar de JSON.
     async function readJson(response) {
@@ -46,6 +64,16 @@
             return JSON.parse(text);
         } catch (error) {
             return { ok: false, error: `Respuesta no válida del servidor (código ${response.status})` };
+        }
+    }
+
+    function updateHeaderInitial() {
+        renderSteps(0);
+        label.textContent = exercises[0].label;
+        select.value = exercises[0].value;
+        video.dataset.testType = exercises[0].value;
+        if (sideLabel) {
+            sideLabel.textContent = sideInstruction();
         }
     }
 
@@ -65,16 +93,30 @@
         select.value = exercise.value;
         video.dataset.testType = exercise.value;
         video.dataset.side = side;
-        if (sideLabel) {
-            const texto = {
-                'Marcha Tandem': 'Pie adelante',
-                'Soporte Monopodal': 'Pierna elevada',
-                'Postura del Arbol': 'Pierna doblada'
-            }[exercise.value] || 'Pierna';
-            sideLabel.textContent = `${texto}: ${side === 'der' ? 'DERECHA' : 'IZQUIERDA'}`;
-        }
+        if (sideLabel) sideLabel.textContent = sideInstruction();
+        renderSteps(exerciseIndex);
         progress.style.width = `${((exerciseIndex * repetitionsPerExercise + repetition) /
             (exercises.length * repetitionsPerExercise)) * 100}%`;
+    }
+
+    // Qué pierna toca, en palabras para la pantalla y para la voz.
+    function sideInstruction() {
+        const pie = currentSide() === 'der' ? 'derecho' : 'izquierdo';
+        const pierna = currentSide() === 'der' ? 'derecha' : 'izquierda';
+        return {
+            'Marcha Tandem': `Ponga el pie ${pie} adelante`,
+            'Soporte Monopodal': `Levante la pierna ${pierna}`,
+            'Postura del Arbol': `Doble la pierna ${pierna}`
+        }[exercises[exerciseIndex].value] || '';
+    }
+
+    function announce(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'es-ES';
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
     }
 
     function startCameraWork() {
@@ -84,6 +126,10 @@
         state.textContent = 'COLÓQUESE EN POSICIÓN';
         state.className = 'fw-bold text-warning';
         updateHeader();
+        // Al inicio de cada repetición se dice con qué pie o pierna empezar.
+        const instruccion = sideInstruction();
+        if (sideLabel) sideLabel.textContent = instruccion;
+        announce(`${exercises[exerciseIndex].label}, repetición ${repetition + 1}. ${instruccion}`);
         if (cameraStarted) {
             video.dispatchEvent(new CustomEvent('axon:resume-work'));
         } else {
@@ -153,6 +199,7 @@
         });
         const result = await readJson(response);
         if (!response.ok || !result.ok) throw new Error(result.error || 'No se pudo cerrar la sesión.');
+        renderSteps(exercises.length);
         state.textContent = result.status === 'COMPLETADA' ? 'SESIÓN COMPLETADA' : 'SESIÓN INCOMPLETA';
         state.className = result.status === 'COMPLETADA' ? 'fw-bold text-success' : 'fw-bold text-danger';
         document.getElementById('sessionSummary').textContent =

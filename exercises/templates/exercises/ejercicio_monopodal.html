@@ -1,23 +1,23 @@
 {% extends "exercises/base.html" %}
 {% load static %}
 
-{% block title %}Axon-Pose | Ejercicio Monopodal{% endblock %}
+{% block title %}Axon-Pose | Apoyo unipodal{% endblock %}
 
 {% block content %}
-<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+<div class="hero-panel mb-3" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <span class="badge bg-warning text-dark mb-2 px-3 py-2 rounded-pill shadow-sm">Prueba 02 - Recomendada</span>
-            <h1 class="fw-bold mb-2"><i class="fas fa-balance-scale me-2"></i> Soporte Monopodal</h1>
+            <span class="badge bg-primary mb-2 px-3 py-2 rounded-pill shadow-sm">Ejercicio 2</span>
+            <h1 class="fw-bold mb-2">Apoyo unipodal</h1>
             <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">Entrena equilibrio y control neuromuscular al sostener el peso del cuerpo en una sola pierna.</p>
         </div>
-        <a class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm px-4" href="{% url 'rutina_diaria' %}">
-            <i class="fas fa-play-circle me-2"></i> Iniciar rutina diaria
+        <a class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm px-4" href="{% url 'rutina_diaria' %}?ejercicio=unipodal">
+            <i class="fas fa-play-circle me-2"></i> Iniciar con este ejercicio
         </a>
     </div>
 </div>
 
-<div class="row g-4 mt-1">
+<div class="row g-4">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
             <div class="card-body p-4">
@@ -32,16 +32,16 @@
                     </iframe>
                 </div>
                 
-                <h5 class="fw-bold text-dark mb-3"><i class="fas fa-list-ol text-primary me-2"></i> Indicaciones paso a paso</h5>
+                <h5 class="fw-bold text-dark mb-3"><i class="fas fa-list-ol icon-muted me-2"></i> Indicaciones paso a paso</h5>
                 <ul class="list-group list-group-flush border-0">
                     <li class="list-group-item bg-transparent px-0 border-bottom border-light">
-                        <i class="fas fa-check-circle text-success me-2"></i> Eleve una pierna 5-10 cm del suelo.
+                        <i class="fas fa-check icon-muted me-2"></i> Levante un pie del suelo, doblando la rodilla, sin apoyarlo en la otra pierna.
                     </li>
                     <li class="list-group-item bg-transparent px-0 border-bottom border-light">
-                        <i class="fas fa-check-circle text-success me-2"></i> Mantenga la pelvis nivelada.
+                        <i class="fas fa-check icon-muted me-2"></i> Levante los brazos a los lados. Si necesita apoyo, deje una mano en la silla y levante la otra.
                     </li>
                     <li class="list-group-item bg-transparent px-0 border-0">
-                        <i class="fas fa-check-circle text-success me-2"></i> Utilice apoyo cercano para seguridad.
+                        <i class="fas fa-check icon-muted me-2"></i> Mantenga la pelvis nivelada y la mirada al frente durante los 20 segundos.
                     </li>
                 </ul>
             </div>
@@ -51,19 +51,19 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
             <div class="card-body p-4">
-                <h5 class="fw-bold text-dark mb-4"><i class="fas fa-heartbeat text-danger me-2"></i> Recomendaciones clínicas</h5>
+                <h5 class="fw-bold text-dark mb-4"><i class="fas fa-notes-medical icon-muted me-2"></i> Recomendaciones clínicas</h5>
                 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-warning">
-                            <h6 class="fw-bold text-dark"><i class="fas fa-stopwatch text-warning me-2"></i> Duración</h6>
-                            <p class="mb-0 text-secondary small">Mantener la posición durante 30 segundos por repetición.</p>
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-secondary-subtle">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-stopwatch icon-muted me-2"></i> Duración</h6>
+                            <p class="mb-0 text-secondary small">20 segundos por repetición, alternando la pierna.</p>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-info">
-                            <h6 class="fw-bold text-dark"><i class="fas fa-sync-alt text-info me-2"></i> Series</h6>
-                            <p class="mb-0 text-secondary small">Completar 5 repeticiones con 15 segundos de descanso.</p>
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-secondary-subtle">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-sync-alt icon-muted me-2"></i> Series</h6>
+                            <p class="mb-0 text-secondary small">6 repeticiones (3 con cada pierna) con 15 segundos de descanso.</p>
                         </div>
                     </div>
                     <div class="col-12">

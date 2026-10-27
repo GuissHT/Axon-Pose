@@ -1387,3 +1387,161 @@ body {
 .image-slot .image-placeholder.is-hidden {
     display: none;
 }
+/* ---- Botón "ojito" para ver la contraseña (password-toggle.js, bitácora D48) ---- */
+.password-field .form-control {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+.password-toggle {
+    border: 1px solid #dee2e6;
+    border-left: 0;
+    background: #ffffff;
+    color: #64748b;
+    border-radius: 0 0.375rem 0.375rem 0 !important;
+    padding: 0 0.9rem;
+    min-width: 3rem;
+}
+.password-toggle:hover,
+.password-toggle:focus-visible {
+    background: #f1f5f9;
+    color: #1f5d88;
+}
+.patient-interface .password-toggle {
+    border: 2px solid #475569;
+    border-left: 0;
+    min-width: 4rem;
+    font-size: 1.4rem;
+}
+
+/* ---- Celular y tableta: el contenido no se corta a la derecha; el menú abierto se superpone ---- */
+@media (max-width: 992px) {
+    .app-layout .main-content,
+    .app-layout .patient-interface .main-content {
+        width: auto;
+        max-width: none;
+        margin-left: var(--sidebar-collapsed-width);
+    }
+    .app-layout:not(.is-sidebar-collapsed) .sidebar {
+        box-shadow: 8px 0 24px rgba(15, 27, 42, 0.35);
+    }
+}
+
+/* ---- Menú lateral más ordenado (bitácora D50) ----
+   Marca en una línea, íconos del mismo ancho, textos que no se cortan y una marca clara
+   en la página activa. Solo estética: los enlaces y el menú plegable funcionan igual. */
+.app-layout .sidebar-brand {
+    gap: 0.75rem;
+    padding-bottom: 1.1rem;
+    margin-bottom: 1rem;
+}
+.app-layout .sidebar-logo-slot {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 0;
+}
+.app-layout .sidebar-brand-title h2 {
+    font-size: 1.3rem;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+.patient-interface .app-layout .sidebar-brand-title h2,
+.patient-interface .sidebar-brand-title h2 {
+    font-size: 1.45rem;
+}
+.app-layout .sidebar .nav {
+    gap: 0.35rem !important;
+}
+.app-layout .sidebar .nav-link {
+    position: relative;
+    gap: 0.85rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 10px;
+    color: #c3cfde;
+    font-weight: 600;
+    transform: none !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.app-layout .sidebar .nav-link > i {
+    flex: 0 0 1.5rem;
+    width: 1.5rem;
+    margin-right: 0 !important;
+    text-align: center;
+    color: #8ea2bb;
+    transition: color 0.15s ease;
+}
+.app-layout .sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+}
+.app-layout .sidebar .nav-link:hover > i {
+    color: #ffffff;
+}
+.app-layout .sidebar .nav-link.active {
+    background-color: rgba(47, 138, 193, 0.2);
+    color: #ffffff;
+}
+.app-layout .sidebar .nav-link.active > i {
+    color: #7cc4f0;
+}
+.app-layout .sidebar .nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: #7cc4f0;
+}
+.app-layout .sidebar .nav-link .nav-label {
+    white-space: normal;
+    overflow: visible;
+    line-height: 1.25;
+}
+/* Paciente: letra grande pero proporcionada */
+.patient-interface .app-layout .sidebar .nav-link,
+.patient-interface .sidebar .nav-link {
+    min-height: 56px;
+    padding: 0.75rem 1rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+.patient-interface .sidebar .nav-link > i {
+    font-size: 1.15rem;
+}
+/* Menú plegado: solo íconos, centrados */
+.app-layout.is-sidebar-collapsed .sidebar .nav-link {
+    gap: 0;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+.app-layout.is-sidebar-collapsed .sidebar .nav-link.active::before {
+    top: 25%;
+    bottom: 25%;
+}
+.app-layout .sidebar-brand-title {
+    flex: 1 1 auto;
+}
+.app-layout .sidebar-brand-title h2 {
+    font-size: clamp(1.05rem, 1.35vw, 1.3rem);
+}
+.patient-interface .app-layout .sidebar-brand-title h2,
+.patient-interface .sidebar-brand-title h2 {
+    font-size: clamp(1.15rem, 1.5vw, 1.45rem);
+}
+.app-layout .sidebar-brand .mobile-menu-toggle {
+    flex: 0 0 auto;
+}
+
+/* D52: iconos de un solo color, sobrios (en lugar de iconos de colores que parecían emojis) */
+.icon-muted { color: #1f5d88; opacity: .85; }
+.consejo-title { font-size: 1.5rem; margin: .25rem 0 .5rem; }
+.consejo-label { font-size: 1.1rem; font-weight: 600; color: #475569; }
+/* Inicio del paciente: letra grande para adultos mayores */
+.patient-summary .summary-label { font-size: 1.15rem; font-weight: 600; color: #475569; }
+.patient-summary .summary-value { font-size: 2.4rem; font-weight: 700; color: #1e293b; line-height: 1.2; margin-top: .5rem; }
+.patient-summary .summary-unit { font-size: 1.25rem; font-weight: 600; color: #64748b; }
+.patient-summary .summary-note { font-size: 1.1rem; color: #475569; }
+.summary-alert { font-size: 1.15rem; }

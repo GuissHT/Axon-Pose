@@ -10,7 +10,7 @@ Rama sugerida: `integracion-modelo` (creada a partir de `main`, commit `0e1607f`
    tándem = tobillos casi en la misma vertical (pies en línea); unipodal y árbol = pie de trabajo levantado.
    Umbral estricto para entrar y tolerante para seguir dentro (histéresis); si no se ven los pies, pide alejarse. Si no, responde
    `fuera_de_posicion` con la indicación ("Coloque un pie delante del otro, en línea", "Levante el pie derecho"…).
-   **El reloj de 30 s empieza recién cuando se detecta la postura.**
+   **El reloj de 20 s empieza recién cuando se detecta la postura.**
 4. Django calcula 33 características (`vision/caracteristicas.py`, el mismo módulo del entrenamiento) y el clasificador decide:
    - **Tándem:** SVM con núcleo RBF.
    - **Apoyo unipodal y árbol:** regresión logística.
@@ -72,7 +72,7 @@ python manage.py runserver
 
 - Las pruebas deben terminar en **OK** (23 pruebas).
 - Luego entra como paciente a `http://127.0.0.1:8000/rutina-diaria/`, presiona **Comenzar ejercicio** y haz el tándem
-  frente a la cámara. Si estás parada normal, el reloj se queda en 00:30 y te dice "Coloque un pie delante del otro";
+  frente a la cámara. Si estás parada normal, el reloj se queda en 00:20 y te dice "Coloque un pie delante del otro";
   al ponerte en tándem dice "Posición correcta. Empezamos" y empieza el conteo. El mensaje cambia cada medio segundo y, si te inclinas, la voz dice "Enderece el tronco".
 
 ## Pendiente / a verificar
@@ -86,4 +86,4 @@ python manage.py runserver
   horizontal (640×480). Las medidas están normalizadas, pero hay que comprobarlo en la prueba real.
 - El badge "Día X de 15" y el límite de 15 días siguen como estaban (decisión pendiente: quitarlos).
 - El árbol todavía acepta el pie sobre la rodilla en las reglas antiguas; el clasificador nuevo sí lo detecta como error.
-- La evaluación de equilibrio estático (`diagnostico.html`) usa una medida simple de oscilación, no un clasificador.
+- La evaluación de Romberg (`diagnostico.html`) mide el balanceo lateral con `vision/romberg.py`; no usa un clasificador.

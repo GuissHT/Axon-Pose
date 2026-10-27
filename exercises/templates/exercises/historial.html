@@ -7,9 +7,9 @@
 <div class="hero-panel mb-4" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px;">
     <h1 class="fw-bold mb-2">
         {% if is_viewing_other %}
-            <i class="fas fa-user-injured me-2"></i> Progreso de: {{ target_user.get_full_name|default:target_user.username }}
+            Progreso de: {{ target_user.get_full_name|default:target_user.username }}
         {% else %}
-            <i class="fas fa-chart-line me-2"></i> Mi progreso histórico
+            Mi progreso histórico
         {% endif %}
     </h1>
     <p class="mb-4 opacity-90">Análisis acumulado de sesiones registradas y seguimiento de la evolución clínica.</p>
@@ -29,7 +29,7 @@
 <!-- ===================== RUTINA DIARIA (resultados del modelo) ===================== -->
 <div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-1"><i class="fas fa-running me-2 text-success"></i> Rutina diaria: ejecuciones correctas e incorrectas</h5>
+        <h5 class="fw-bold mb-1"><i class="fas fa-running me-2 icon-muted"></i> Rutina diaria: ejecuciones correctas e incorrectas</h5>
         <p class="text-muted small mb-4">Cada repetición de 20 s la califica el modelo: es <strong>correcta</strong> si estuvo mal como mucho la mitad del tiempo.</p>
 
         {% if rutinas.repeticiones %}
@@ -62,35 +62,39 @@
             </div>
         </div>
 
-        <div class="row g-4 mb-4">
-            <div class="col-lg-7">
-                <h6 class="fw-bold">% de repeticiones correctas por sesión</h6>
-                <div style="height: 260px;"><canvas id="routineChart"></canvas></div>
-            </div>
-            <div class="col-lg-5">
-                <h6 class="fw-bold">Acumulado por ejercicio</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle">
-                        <thead class="table-light">
-                            <tr><th>Ejercicio</th><th class="text-center">Correctas</th><th class="text-center">Der.</th><th class="text-center">Izq.</th><th>Error más frecuente</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for e in rutinas.por_ejercicio %}
-                            <tr>
-                                <td class="fw-semibold">{{ e.nombre }}</td>
-                                <td class="text-center">{{ e.ok }}/{{ e.total }}{% if e.total %} <small class="text-muted">({{ e.pct }} %)</small>{% endif %}</td>
-                                <td class="text-center">{% if e.pct_der is not None %}{{ e.pct_der }} %{% else %}-{% endif %}</td>
-                                <td class="text-center">{% if e.pct_izq is not None %}{{ e.pct_izq }} %{% else %}-{% endif %}</td>
-                                <td><small>{{ e.error }}</small></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        <h6 class="fw-bold">% de repeticiones correctas por sesión</h6>
+        <div class="mb-4" style="height: 280px;"><canvas id="routineChart"></canvas></div>
 
-        <h6 class="fw-bold">Historial de sesiones</h6>
+        <h6 class="fw-bold mb-2">Acumulado por ejercicio</h6>
+        <ul class="list-group list-group-flush border-top border-bottom mb-4">
+            {% for e in rutinas.por_ejercicio %}
+            <li class="list-group-item px-0 py-3">
+                <div class="row align-items-center g-2">
+                    <div class="col-md-3 fw-semibold">{{ e.nombre }}</div>
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>Correctas: <strong>{{ e.ok }}/{{ e.total }}</strong></span>
+                            {% if e.total %}<span class="text-muted">{{ e.pct }} %</span>{% endif %}
+                        </div>
+                        <div class="progress" style="height: 8px;" role="progressbar" aria-label="Correctas en {{ e.nombre }}">
+                            <div class="progress-bar bg-success" style="width: {{ e.pct|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 small text-center">
+                        Der. <strong>{% if e.pct_der is not None %}{{ e.pct_der }} %{% else %}-{% endif %}</strong>
+                        <span class="text-muted mx-1">·</span>
+                        Izq. <strong>{% if e.pct_izq is not None %}{{ e.pct_izq }} %{% else %}-{% endif %}</strong>
+                    </div>
+                    <div class="col-md-3 small">
+                        <span class="text-muted">Error más frecuente:</span>
+                        <span class="{% if e.error %}text-danger fw-semibold{% endif %}">{{ e.error|default:"-" }}</span>
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <h6 class="fw-bold">Historial por sesiones</h6>
         <div class="table-responsive">
             <table class="table table-hover align-middle border-top">
                 <thead class="table-light">
@@ -154,7 +158,7 @@
 <!-- ===================== EVALUACIÓN DE ROMBERG ===================== -->
 <div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-1"><i class="fas fa-stethoscope me-2 text-primary"></i> Evaluación de Romberg</h5>
+        <h5 class="fw-bold mb-1"><i class="fas fa-stethoscope me-2 icon-muted"></i> Evaluación de Romberg</h5>
         <p class="text-muted small mb-4">Balanceo lateral medido con la cámara (30 s con ojos abiertos y 30 s con ojos cerrados). Es una referencia: la inicial, antes de la primera rutina, y la final, al terminar, para comparar.</p>
         {% if romberg_tests %}
         <div class="table-responsive">
@@ -189,7 +193,7 @@
 <!-- Sección de Encuesta de Salud -->
 <div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-4"><i class="fas fa-clipboard-check me-2 text-info"></i> Resultados de la Encuesta de Salud</h5>
+        <h5 class="fw-bold mb-4"><i class="fas fa-clipboard-check me-2 icon-muted"></i> Resultados de la Encuesta de Salud</h5>
         
         {% if survey_responses %}
             <div class="row g-3">

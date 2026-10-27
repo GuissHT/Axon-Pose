@@ -328,7 +328,20 @@ def inicio(request):
         return redirect('doctor_dashboard')
 
     advices = DoctorAdvice.objects.filter(is_active=True)[:5]
-    return render(request, 'exercises/inicio.html', {'advices': advices})
+    # Resumen rápido para el paciente: días hechos, repeticiones correctas y próxima cita.
+    reps = ExerciseRepetition.objects.filter(detail__session__patient=request.user)
+    total = reps.count()
+    correctas = reps.filter(result='OK').count()
+    resumen = {
+        'dias': DailySession.objects.filter(patient=request.user, status='COMPLETADA').count(),
+        'total_reps': total,
+        'pct_correctas': round(100 * correctas / total) if total else None,
+        'proxima_cita': Appointment.objects.filter(
+            patient=request.user, is_completed=False, status='PENDIENTE', date__gte=timezone.now()
+        ).order_by('date').first(),
+        'romberg_inicial': _romberg_valido(request.user, 'INICIAL'),
+    }
+    return render(request, 'exercises/inicio.html', {'advices': advices, 'resumen': resumen})
 
 
 @login_required
@@ -522,7 +535,7 @@ def rutina_diaria(request):
     if _is_doctor(request.user):
         return redirect('evaluacion')
     if not _romberg_valido(request.user, 'INICIAL'):
-        messages.info(request, 'Antes de la primera rutina, haga la evaluación inicial de Romberg.')
+        # La página de evaluación ya explica que primero va la evaluación inicial.
         return redirect('evaluacion')
     requested_day = request.GET.get('day')
     if requested_day:

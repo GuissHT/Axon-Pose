@@ -5,22 +5,23 @@
 
 {% block content %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-<section class="mb-4">
-    <div class="hero-panel p-4 rounded-4 text-white" style="background: linear-gradient(135deg, #0f766e, #0369a1);">
-        <span class="badge bg-warning text-dark mb-2">Día {{ day_number }} de 15</span>
-        <h1 class="fw-bold mb-2">Rutina diaria de equilibrio</h1>
-        <p class="mb-0">Posición en tándem, apoyo unipodal y postura del árbol: 6 repeticiones de 20 segundos cada uno (3 con cada pierna, alternando), con descansos de 15 segundos.</p>
+<section class="routine-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="d-flex align-items-center gap-3">
+        <h1 class="h4 fw-bold mb-0">Rutina diaria</h1>
+        <span class="badge bg-warning text-dark">Día {{ day_number }} de 15</span>
     </div>
+    <ol class="routine-steps list-unstyled d-flex flex-wrap gap-2 mb-0" id="routineSteps" aria-label="Orden de los ejercicios"></ol>
+    <small class="text-muted w-100">6 repeticiones de 20 s por ejercicio (3 con cada pierna) y 15 s de descanso.</small>
 </section>
 
 <div class="row g-4">
     <div class="col-lg-8">
-        <article class="video-panel position-relative rounded-4 overflow-hidden" style="background:#0f172a; min-height:500px;">
+        <article class="video-panel position-relative rounded-4 overflow-hidden" style="background:#0f172a;">
             <div class="p-3 position-absolute w-100 z-1 d-flex justify-content-between">
                 <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill">Cámara inactiva</span>
                 <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill">Listo para comenzar</span>
             </div>
-            <div class="camera-stage position-relative" style="height:500px;background:#000;">
+            <div class="camera-stage routine-camera position-relative" style="background:#000;">
                 <video id="webcam" data-session-id="{{ daily_session.id }}" data-day-number="{{ day_number }}" data-test-type="Marcha Tandem" data-side="der" data-duration-sec="20" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;position:absolute;transform:scaleX(-1);"></video>
                 <canvas id="output_canvas" style="width:100%;height:100%;object-fit:contain;position:absolute;z-index:10;"></canvas>
                 <div id="cameraPlaceholder" class="text-white text-center position-absolute top-50 start-50 translate-middle">
@@ -32,11 +33,11 @@
     </div>
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-body p-4">
+            <div class="card-body p-3 p-xl-4">
                 <h2 id="routineState" class="fw-bold text-success">PREPARADO</h2>
                 <p id="exerciseLabel" class="fs-5 mb-1">Posición en tándem</p>
-                <p id="sideLabel" class="fw-semibold text-secondary mb-1">Pie adelante: DERECHA</p>
-                <div id="routineTimer" class="display-1 fw-bold text-primary">00:20</div>
+                <p id="sideLabel" class="side-instruction mb-2">Ponga el pie derecho adelante</p>
+                <div id="routineTimer" class="display-3 fw-bold text-primary">00:20</div>
                 <select id="testTypeSelect" class="form-select visually-hidden" aria-label="Ejercicio actual">
                     <option value="Marcha Tandem">Posición en tándem</option>
                     <option value="Soporte Monopodal">Apoyo unipodal</option>
@@ -54,11 +55,18 @@
         </div>
     </div>
 </div>
+<style>
+    .routine-camera { height: clamp(320px, calc(100vh - 210px), 640px); }
+    .routine-steps li { padding: .25rem .8rem; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: .9rem; }
+    .routine-steps li.active { background: #0f766e; color: #fff; font-weight: 600; }
+    .side-instruction { font-size: 1.05rem; font-weight: 700; color: #0f766e; background: #ecfdf5; border-left: 4px solid #0f766e; border-radius: .5rem; padding: .3rem .7rem; }
+    .routine-steps li.done { background: #dcfce7; color: #166534; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="{% static 'exercises/js/camera.js' %}"></script>
-<script src="{% static 'exercises/js/rutina.js' %}"></script>
+<script src="{% static 'exercises/js/camera.js' %}?v=2026102702"></script>
+<script src="{% static 'exercises/js/rutina.js' %}?v=2026102702"></script>
 {% endblock %}

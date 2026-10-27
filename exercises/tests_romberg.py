@@ -147,5 +147,5 @@ class RombergApiTests(TestCase):
         self._enviar('INICIAL')
         resp = self.client.get('/evaluacion/')
         self.assertIsNone(resp.context['evaluation_type'])  # nada pendiente: muestra resultados
-        self.assertContains(resp, 'Ir a la rutina diaria')
+        self.assertContains(resp, 'Ir a los ejercicios')
         self.assertEqual(self.client.get('/evaluacion/?phase=FINAL').context['evaluation_type'], 'FINAL')

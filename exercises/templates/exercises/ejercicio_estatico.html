@@ -1,23 +1,23 @@
 {% extends "exercises/base.html" %}
 {% load static %}
 
-{% block title %}Axon-Pose | Equilibrio del Árbol{% endblock %}
+{% block title %}Axon-Pose | Postura del árbol{% endblock %}
 
 {% block content %}
-<div class="hero-panel mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+<div class="hero-panel mb-3" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <span class="badge bg-primary mb-2 px-3 py-2 rounded-pill shadow-sm">Prueba 01</span>
-            <h1 class="fw-bold mb-2"><i class="fas fa-child me-2"></i> Equilibrio del Árbol</h1>
-            <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">Mantenga el equilibrio sobre una pierna durante 30 segundos para fortalecer la estabilidad y el control postural.</p>
+            <span class="badge bg-primary mb-2 px-3 py-2 rounded-pill shadow-sm">Ejercicio 3</span>
+            <h1 class="fw-bold mb-2">Postura del árbol</h1>
+            <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">Apoyo en una pierna con el pie contrario sobre la pierna de apoyo. Entrena el control postural.</p>
         </div>
-        <a class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm px-4" href="{% url 'rutina_diaria' %}">
-            <i class="fas fa-play-circle me-2"></i> Iniciar rutina diaria
+        <a class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm px-4" href="{% url 'rutina_diaria' %}?ejercicio=arbol">
+            <i class="fas fa-play-circle me-2"></i> Iniciar con este ejercicio
         </a>
     </div>
 </div>
 
-<div class="row g-4 mt-1">
+<div class="row g-4">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
             <div class="card-body p-4">
@@ -32,16 +32,16 @@
                     </iframe>
                 </div>
                 
-                <h5 class="fw-bold text-dark mb-3"><i class="fas fa-list-ol text-primary me-2"></i> Indicaciones paso a paso</h5>
+                <h5 class="fw-bold text-dark mb-3"><i class="fas fa-list-ol icon-muted me-2"></i> Indicaciones paso a paso</h5>
                 <ul class="list-group list-group-flush border-0">
                     <li class="list-group-item bg-transparent px-0 border-bottom border-light">
-                        <i class="fas fa-check-circle text-success me-2"></i> Pies separados al ancho de cadera.
+                        <i class="fas fa-check icon-muted me-2"></i> Apoye la planta de un pie en el tobillo o la pantorrilla de la otra pierna, nunca sobre la rodilla.
                     </li>
                     <li class="list-group-item bg-transparent px-0 border-bottom border-light">
-                        <i class="fas fa-check-circle text-success me-2"></i> Mirada al frente, hombros relajados.
+                        <i class="fas fa-check icon-muted me-2"></i> Levante los brazos. Si necesita apoyo, deje una mano en la silla y levante la otra.
                     </li>
                     <li class="list-group-item bg-transparent px-0 border-0">
-                        <i class="fas fa-check-circle text-success me-2"></i> Respire de forma lenta y continua.
+                        <i class="fas fa-check icon-muted me-2"></i> Mire al frente y respire de forma lenta durante los 20 segundos.
                     </li>
                 </ul>
             </div>
@@ -51,18 +51,18 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
             <div class="card-body p-4">
-                <h5 class="fw-bold text-dark mb-4"><i class="fas fa-heartbeat text-danger me-2"></i> Recomendaciones clínicas</h5>
+                <h5 class="fw-bold text-dark mb-4"><i class="fas fa-notes-medical icon-muted me-2"></i> Recomendaciones clínicas</h5>
                 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-warning">
-                            <h6 class="fw-bold text-dark"><i class="fas fa-sync-alt text-warning me-2"></i> Repeticiones</h6>
-                            <p class="mb-0 text-secondary small">Realizar 5 repeticiones de 30 segundos cada una.</p>
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-secondary-subtle">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-sync-alt icon-muted me-2"></i> Repeticiones</h6>
+                            <p class="mb-0 text-secondary small">6 repeticiones de 20 segundos (3 con cada pierna, alternando).</p>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-info">
-                            <h6 class="fw-bold text-dark"><i class="fas fa-bed text-info me-2"></i> Descanso</h6>
+                        <div class="p-3 bg-light rounded-3 h-100 border-start border-4 border-secondary-subtle">
+                            <h6 class="fw-bold text-dark"><i class="fas fa-bed icon-muted me-2"></i> Descanso</h6>
                             <p class="mb-0 text-secondary small">Descansar 15 segundos entre repeticiones.</p>
                         </div>
                     </div>

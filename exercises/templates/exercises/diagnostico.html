@@ -1,123 +1,86 @@
 {% extends "exercises/base.html" %}
 {% load static %}
 
-{% block title %}Axon-Pose | Diagnóstico{% endblock %}
+{% block title %}Axon-Pose | Evaluación de equilibrio{% endblock %}
 
 {% block content %}
 {% if not is_doctor %}
 <meta name="csrf-token" content="{{ csrf_token }}">
-{% if romberg.inicial %}
-<!-- Mediciones de referencia ya registradas -->
-<div class="card border-0 shadow-sm rounded-4 mb-4" style="background: rgba(255, 255, 255, 0.95);">
-    <div class="card-body p-4">
-        <h5 class="fw-bold mb-1"><i class="fas fa-stethoscope me-2 text-primary"></i> Sus evaluaciones de Romberg</h5>
-        <p class="text-muted small mb-3">Balanceo lateral medido con la cámara. Es una referencia para seguir su evolución, no una calificación.</p>
-        <div class="row g-3">
-            {% for nombre, t in romberg_cards %}
-            <div class="col-md-6">
-                <div class="p-3 rounded-4 border bg-light h-100">
-                    <div class="fw-bold">{{ nombre }} <small class="text-muted fw-normal">{{ t.created_at|date:"d/m/Y" }}</small></div>
-                    <div class="mt-2">Ojos abiertos: <strong>{{ t.sway_open_cm }} cm</strong> <small class="text-muted">{{ t.side_open }}</small></div>
-                    <div>Ojos cerrados: <strong>{{ t.sway_closed_cm }} cm</strong> <small class="text-muted">{{ t.side_closed }}</small></div>
-                    {% if t.doctor_note %}<div class="small text-muted mt-2">Nota del doctor: {{ t.doctor_note }}</div>{% endif %}
-                </div>
+
+{% if evaluation_type %}
+<!-- ============ Evaluación de Romberg: 1) instrucciones  2) medición  3) resultado ============ -->
+<section class="romberg" data-routine-url="{% url 'rutina_diaria' %}">
+
+    <!-- 1) Instrucciones -->
+    <div id="rombergIntro" class="romberg-card">
+        <span class="badge bg-primary rounded-pill px-3 py-2 mb-3">Evaluación {{ evaluation_type|lower }} · 1 minuto</span>
+        <h1 class="fw-bold mb-2">Evaluación de equilibrio</h1>
+        <p class="lead mb-4">{% if evaluation_type == 'INICIAL' %}Antes de su primera rutina medimos cómo se mantiene de pie. Al terminar podrá empezar los ejercicios.{% else %}Repetimos la medición del inicio para ver cómo cambió su equilibrio.{% endif %}</p>
+        <ol class="romberg-steps">
+            <li><strong>Párese con los pies juntos</strong> frente a la cámara, de modo que se vea de la cabeza a los pies.</li>
+            <li><strong>30 segundos con los ojos abiertos</strong>, mirando al frente.</li>
+            <li><strong>30 segundos con los ojos cerrados.</strong> El sistema le avisará con la voz.</li>
+        </ol>
+        <p class="text-secondary mb-4"><i class="fas fa-user-nurse me-2"></i>El doctor debe estar a su lado y la silla cerca.</p>
+        <button id="btnStartEval" type="button" class="btn btn-success btn-lg rounded-pill px-5 fw-bold">
+            <i class="fas fa-play me-2"></i>Comenzar
+        </button>
+    </div>
+
+    <!-- 2) Medición -->
+    <div id="rombergRun" class="romberg-run d-none">
+        <div class="romberg-camera">
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="output_canvas"></canvas>
+            <span id="badgeCamera" class="visually-hidden">Cámara inactiva</span>
+        </div>
+        <aside class="romberg-panel">
+            <div id="phaseIndicator" class="romberg-phase">Fase 1 de 2: Ojos abiertos</div>
+            <div id="timerLabel" class="romberg-timer">00:30</div>
+            <div class="progress romberg-progress"><div id="testProgress" class="progress-bar" style="width: 0%"></div></div>
+            <div id="phaseNotice" class="romberg-instruction" role="status">Párese con los pies juntos</div>
+            <div id="badgeAlignment" class="romberg-status">Buscando su cuerpo…</div>
+            <div class="romberg-metrics">
+                <div><small>Balanceo</small><strong id="metricSway">-- cm</strong></div>
+                <div><small>Hacia</small><strong id="metricSide">--</strong></div>
+                <div><small>Tronco</small><strong id="metricAngle">--</strong></div>
             </div>
-            {% endfor %}
+            <button id="btnStopEval" type="button" class="btn btn-outline-secondary rounded-pill w-100" disabled>
+                <i class="fas fa-stop me-2"></i>Detener
+            </button>
+        </aside>
+    </div>
+
+    <!-- 3) Resultado (lo completa camera.js) -->
+    <div id="rombergResult" aria-live="polite"></div>
+</section>
+
+{% else %}
+<!-- ============ Evaluaciones ya realizadas ============ -->
+<section class="romberg-card">
+    <h1 class="fw-bold mb-1">Evaluación de equilibrio</h1>
+    <p class="text-secondary mb-4">Su balanceo medido con la cámara. Es una referencia para seguir su evolución.</p>
+    <div class="row g-3">
+        {% for nombre, t in romberg_cards %}
+        <div class="col-md-6">
+            <div class="romberg-summary">
+                <div class="fw-bold">{{ nombre }} <small class="text-muted fw-normal">{{ t.created_at|date:"d/m/Y" }}</small></div>
+                <div>Ojos abiertos: <strong>{{ t.sway_open_cm }} cm</strong> <small class="text-muted">{{ t.side_open }}</small></div>
+                <div>Ojos cerrados: <strong>{{ t.sway_closed_cm }} cm</strong> <small class="text-muted">{{ t.side_closed }}</small></div>
+                {% if t.doctor_note %}<div class="small text-muted mt-1">Nota: {{ t.doctor_note }}</div>{% endif %}
+            </div>
         </div>
-        {% if romberg.cambio_cerrados is not None %}
-        <p class="mt-3 mb-0">Cambio con ojos cerrados: <strong>{{ romberg.cambio_cerrados }} cm</strong> <small class="text-muted">(negativo = se balancea menos que al inicio)</small></p>
-        {% endif %}
-        {% if not evaluation_type %}
-        <div class="d-flex flex-wrap gap-2 mt-3">
-            <a href="{% url 'rutina_diaria' %}" class="btn btn-success rounded-pill px-4 fw-bold">Ir a la rutina diaria</a>
-            {% if not romberg.final %}
-            <a href="{% url 'evaluacion' %}?phase=FINAL" class="btn btn-outline-primary rounded-pill px-4">Hacer la evaluación final (al terminar el programa)</a>
-            {% endif %}
-        </div>
+        {% endfor %}
+    </div>
+    {% if romberg.cambio_cerrados is not None %}
+    <p class="mt-3 mb-0">Cambio con ojos cerrados: <strong>{{ romberg.cambio_cerrados }} cm</strong> <small class="text-muted">(negativo = menos balanceo)</small></p>
+    {% endif %}
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a href="{% url 'rutina_diaria' %}" class="btn btn-success btn-lg rounded-pill px-4 fw-bold"><i class="fas fa-running me-2"></i>Ir a los ejercicios</a>
+        {% if not romberg.final %}
+        <a href="{% url 'evaluacion' %}?phase=FINAL" class="btn btn-outline-primary btn-lg rounded-pill px-4">Evaluación final</a>
         {% endif %}
     </div>
-</div>
-{% endif %}
-{% if evaluation_type %}
-<section class="diagnostic-layout diagnostic-layout--romberg">
-    <article class="info-panel" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
-        <span class="badge bg-primary mb-2 align-self-start px-3 py-2 rounded-pill"><i class="fas fa-stethoscope me-1"></i> Evaluación {{ evaluation_type|lower }}</span>
-        <h1 class="fw-bold mb-3">Evaluación de Romberg</h1>
-        <p class="text-secondary" style="font-size: 1.1rem;">Párese con los pies juntos 30 segundos con los ojos abiertos y 30 segundos con los ojos cerrados. El sistema mide cuánto se balancea y hacia qué lado y lo guarda como referencia{% if evaluation_type == 'INICIAL' %}; después podrá empezar la rutina diaria{% else %}, para compararlo con la evaluación inicial{% endif %}.</p>
-
-        <div class="card border-0 bg-light rounded-4 mb-3" style="border-left: 4px solid #1f5d88 !important;">
-            <div class="card-body">
-                <h5 class="fw-bold text-dark"><i class="fas fa-info-circle me-2 text-primary"></i> Instrucción principal</h5>
-                <ul class="mb-0 ps-3">
-                    <li>Ubíquese de pie frente a la cámara, de modo que se vea de la cabeza a los pies.</li>
-                    <li>Mantenga los pies juntos y la postura recta.</li>
-                    <li>Coloque las manos pegadas a los lados del cuerpo o extendidas hacia adelante.</li>
-                    <li>Mantenga la mirada fija al frente durante los 30 segundos.</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="alert alert-warning border-warning rounded-4 mb-3 d-flex align-items-start gap-2" role="alert">
-            <span class="fs-5" aria-hidden="true">⚠️</span>
-            <div>
-                <strong>Recomendación de seguridad:</strong>
-                Realice esta evaluación con supervisión médica.
-            </div>
-        </div>
-
-        <div class="mt-auto">
-            <div class="d-flex justify-content-between align-items-center mb-2 phase-header">
-                <span class="fw-bold text-primary" id="phaseIndicator">Fase 1 de 2: Ojos Abiertos</span>
-                <span id="timerLabel" class="fw-bold text-primary fs-4">00:30</span>
-            </div>
-            <div id="phaseNotice" class="alert alert-info py-2 px-3 rounded-3 mb-3 d-none" role="status"></div>
-            <div class="progress mb-4 rounded-pill" style="height: 12px; background-color: #e2e8f0;">
-                <div id="testProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill" style="width: 0%"></div>
-            </div>
-
-            <div id="rombergResult" class="mb-3" aria-live="polite"></div>
-
-            <div class="d-grid gap-3 d-sm-flex">
-                <button id="btnStartEval" class="btn btn-warning btn-lg flex-fill fw-bold rounded-pill shadow-sm" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white;">
-                    <i class="fas fa-play me-2"></i> Comenzar evaluación
-                </button>
-                <button id="btnStopEval" class="btn btn-outline-secondary btn-lg flex-fill fw-bold rounded-pill" disabled>
-                    <i class="fas fa-stop me-2"></i> Detener
-                </button>
-            </div>
-        </div>
-    </article>
-
-    <article class="video-panel position-relative video-panel--romberg" style="background: #0f172a; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); min-height: 400px; display: flex; flex-direction: column;">
-        <div class="d-flex justify-content-between p-3 position-absolute w-100 z-1 camera-status">
-            <span id="badgeCamera" class="badge bg-secondary px-3 py-2 rounded-pill shadow"><i class="fas fa-video-slash me-1"></i> Cámara inactiva</span>
-            <span id="badgeAlignment" class="badge bg-info text-dark px-3 py-2 rounded-pill shadow"><i class="fas fa-ruler-combined me-1"></i> En espera</span>
-        </div>
-
-        <div class="camera-stage flex-grow-1 position-relative" style="display: flex; justify-content: center; align-items: center; background-color: #000;">
-            <video id="webcam" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: contain; position: absolute; transform: scaleX(-1);"></video>
-            <canvas id="output_canvas" style="width: 100%; height: 100%; object-fit: contain; position: absolute; z-index: 10;"></canvas>
-            <div id="cameraPlaceholder" class="text-white text-center z-0">
-                <i class="fas fa-camera fa-3x mb-3 text-secondary"></i>
-                <p class="mb-0 text-secondary">Presiona "Comenzar evaluación" para activar la cámara</p>
-            </div>
-        </div>
-
-        <div class="metrics-overlay p-3 d-flex gap-2 position-absolute bottom-0 w-100" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); z-index: 20;">
-            <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Balanceo</small>
-                <div id="metricSway" class="text-white fw-bold fs-4">-- cm</div>
-            </div>
-            <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Hacia</small>
-                <div id="metricSide" class="text-white fw-bold fs-4">--</div>
-            </div>
-            <div class="metric-box flex-fill text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <small class="text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Tronco</small>
-                <div id="metricAngle" class="text-white fw-bold fs-4">--</div>
-            </div>
-        </div>
-    </article>
 </section>
 {% endif %}
 {% endif %}
@@ -125,7 +88,7 @@
 {% if is_doctor %}
 <div class="card border-0 shadow-sm rounded-4 mt-0 doctor-results-card" style="background: rgba(255, 255, 255, 0.9); min-height: 75vh;">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-1 text-dark results-title"><i class="fas fa-users-viewfinder text-primary me-2"></i> Evaluación de Romberg por paciente</h5>
+        <h5 class="fw-bold mb-1 text-dark results-title"><i class="fas fa-users-viewfinder icon-muted me-2"></i> Evaluación de Romberg por paciente</h5>
         <p class="text-muted small mb-4">Balanceo lateral medido con la cámara: la evaluación inicial (antes de la primera rutina) y la final (opcional). Puede dejar una nota en cada una.</p>
         <div class="table-responsive results-table-wrapper">
             <table class="table table-hover align-middle results-table">
@@ -180,257 +143,89 @@
 </div>
 {% endif %}
 
+
 <style>
-    .bg-primary-subtle { background-color: #e0f2fe !important; }
-    .diagnostic-layout--romberg {
+    /* ---------- Romberg (paciente) ---------- */
+    .romberg-card {
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        padding: clamp(1.25rem, 3vw, 2.5rem);
+        max-width: 860px;
+        margin: 0 auto;
+    }
+    .romberg-steps { font-size: 1.15rem; padding-left: 1.4rem; margin-bottom: 1.25rem; }
+    .romberg-steps li { margin-bottom: .6rem; }
+    .romberg-run {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 1rem;
+        /* ocupa la pantalla disponible sin obligar a desplazarse */
+        height: calc(100vh - 170px);
+        min-height: 420px;
+    }
+    .romberg-run.d-none { display: none !important; }
+    .romberg-camera {
+        position: relative;
+        background: #0f172a;
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    .romberg-camera video,
+    .romberg-camera canvas {
+        position: absolute;
+        inset: 0;
         width: 100%;
-        max-width: 100%;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: clamp(1rem, 3vw, 2rem);
-        min-height: 75vh;
+        height: 100%;
+        object-fit: contain;
     }
-    .diagnostic-layout--romberg > *,
-    .doctor-results-card {
-        min-width: 0;
-        max-width: 100%;
+    .romberg-camera video { transform: scaleX(-1); }
+    .romberg-camera canvas { z-index: 2; }
+    .romberg-panel {
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
     }
-    .diagnostic-layout--romberg .info-panel {
-        overflow: visible;
+    .romberg-phase { font-weight: 700; color: #1f5d88; font-size: 1.1rem; }
+    .romberg-timer { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800; line-height: 1; color: #0f172a; }
+    .romberg-progress { height: 10px; border-radius: 99px; }
+    .romberg-instruction { font-size: 1.3rem; font-weight: 700; color: #0f172a; }
+    .romberg-status { color: #475569; min-height: 1.5em; }
+    .romberg-status.warning { color: #b45309; font-weight: 600; }
+    .romberg-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-top: auto; }
+    .romberg-metrics div { background: #f1f5f9; border-radius: 12px; padding: .5rem; text-align: center; }
+    .romberg-metrics small { display: block; color: #64748b; font-size: .75rem; text-transform: uppercase; font-weight: 700; }
+    .romberg-metrics strong { font-size: 1.05rem; }
+    .romberg-summary { border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem; background: #f8fafc; height: 100%; }
+    #rombergResult:empty { display: none; }
+    @media (max-width: 900px) {
+        .romberg-run { grid-template-columns: 1fr; height: auto; }
+        .romberg-camera { height: min(70vh, 520px); }
+        .romberg-metrics { margin-top: 0; }
     }
-    .diagnostic-layout--romberg h1,
-    .diagnostic-layout--romberg p,
-    .diagnostic-layout--romberg li,
-    .doctor-results-card td,
-    .doctor-results-card th {
-        overflow-wrap: anywhere;
-    }
-    .doctor-results-card {
-        min-height: min(75vh, 760px) !important;
-    }
-    .doctor-results-card .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    .doctor-results-card table {
-        min-width: 700px;
-    }
-    .results-title {
-        overflow-wrap: anywhere;
-    }
-    .video-panel--romberg {
-        min-height: clamp(360px, 58vw, 640px) !important;
-    }
-    @media (max-width: 991px) {
-        .diagnostic-layout--romberg {
-            grid-template-columns: minmax(0, 1fr);
-            min-height: auto;
-        }
-        .info-panel {
-            min-height: auto;
-        }
-        .video-panel--romberg {
-            min-height: clamp(360px, 75vw, 520px) !important;
-        }
-        .doctor-results-card {
-            min-height: auto !important;
-        }
-        .doctor-results-card .card-body {
-            padding: clamp(1rem, 3vw, 1.5rem) !important;
-        }
-        .diagnostic-layout--romberg .info-panel,
-        .diagnostic-layout--romberg .video-panel--romberg {
-            width: 100%;
-        }
-    }
-    @media (min-width: 1200px) {
-        .diagnostic-layout--romberg {
-            gap: clamp(1.5rem, 2.5vw, 2.5rem);
-        }
-        .diagnostic-layout--romberg .info-panel {
-            padding: clamp(1.5rem, 2.2vw, 2.5rem) !important;
-        }
-        .doctor-results-card .card-body {
-            padding: clamp(1.5rem, 2.5vw, 2.5rem) !important;
-        }
-    }
-    @media (min-width: 577px) and (max-width: 1199px) {
-        .diagnostic-layout--romberg h1 {
-            font-size: clamp(1.6rem, 3.2vw, 2.25rem);
-        }
-        .diagnostic-layout--romberg .info-panel {
-            padding: clamp(1.25rem, 2.5vw, 2rem) !important;
-        }
-        .doctor-results-card .card-body {
-            padding: clamp(1.25rem, 2.5vw, 2rem) !important;
-        }
-    }
+
+    /* ---------- Tabla del doctor ---------- */
+    .doctor-results-card .table-responsive { overflow-x: auto; }
+    .doctor-results-card table { min-width: 700px; }
     @media (max-width: 576px) {
-        .doctor-results-card {
-            border-radius: 14px !important;
-        }
-        .doctor-results-card .card-body {
-            padding: 1rem !important;
-        }
-        .results-title {
-            font-size: 1rem;
-            line-height: 1.35;
-        }
-        .results-table-wrapper {
-            overflow: visible !important;
-        }
-        .results-table {
-            min-width: 0 !important;
-            display: block;
-            margin-bottom: 0;
-        }
-        .results-table thead {
-            display: none;
-        }
-        .results-table tbody,
-        .results-table tr,
-        .results-table td {
-            display: block;
-            width: 100%;
-        }
-        .results-table tr {
-            padding: 0.8rem;
-            margin-bottom: 0.75rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            background: #ffffff;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-        }
-        .results-table td {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 0.75rem;
-            padding: 0.45rem 0;
-            border: 0;
-            text-align: right !important;
-            overflow-wrap: anywhere;
-        }
-        .results-table td::before {
-            flex: 0 0 44%;
-            color: #64748b;
-            content: attr(data-label);
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-align: left;
-            text-transform: uppercase;
-        }
-        .results-table td:first-child {
-            padding-top: 0;
-        }
-        .results-table td:last-child {
-            padding-bottom: 0;
-        }
-        .results-table td[colspan] {
-            display: block;
-            text-align: center !important;
-        }
-        .results-table td[colspan]::before {
-            display: none;
-        }
-        .diagnostic-layout--romberg .info-panel {
-            padding: 1.25rem !important;
-        }
-        .diagnostic-layout--romberg h1 {
-            font-size: clamp(1.5rem, 8vw, 2rem);
-        }
-        .diagnostic-layout--romberg .phase-header {
-            align-items: flex-start !important;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        .diagnostic-layout--romberg .phase-header #timerLabel {
-            font-size: 1.5rem !important;
-        }
-        .diagnostic-layout--romberg .d-grid.d-sm-flex .btn {
-            width: 100%;
-        }
-        .camera-status {
-            align-items: flex-start !important;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .metrics-overlay {
-            flex-wrap: wrap;
-        }
-        .metric-box {
-            min-width: calc(50% - 0.25rem);
-        }
-        .metric-box:last-child {
-            min-width: 100%;
-        }
-        .diagnostic-layout--romberg .card-body,
-        .diagnostic-layout--romberg .alert {
-            max-width: 100%;
-        }
-        .diagnostic-layout--romberg {
-            gap: 1rem;
-        }
-        .diagnostic-layout--romberg .info-panel {
-            border-radius: 14px !important;
-        }
-        .diagnostic-layout--romberg .info-panel p,
-        .diagnostic-layout--romberg .info-panel li {
-            font-size: 0.95rem !important;
-            line-height: 1.45;
-        }
-        .diagnostic-layout--romberg .alert {
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
-        .video-panel--romberg {
-            min-height: min(112vw, 460px) !important;
-            border-radius: 14px !important;
-            padding: 0.75rem !important;
-        }
-        .video-panel--romberg .camera-stage {
-            min-height: min(100vw, 400px);
-        }
-        .video-panel--romberg .badge {
-            max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .doctor-results-card table {
-            font-size: 0.9rem;
-        }
-    }
-    @media (max-width: 380px) {
-        .diagnostic-layout--romberg .info-panel {
-            padding: 1rem !important;
-        }
-        .diagnostic-layout--romberg h1 {
-            font-size: 1.45rem;
-        }
-        .diagnostic-layout--romberg .phase-header #phaseIndicator {
-            font-size: 0.9rem;
-        }
-        .video-panel--romberg {
-            min-height: 360px !important;
-        }
-        .video-panel--romberg .camera-stage {
-            min-height: 300px;
-        }
+        .results-table { min-width: 0 !important; display: block; }
+        .results-table thead { display: none; }
+        .results-table tbody, .results-table tr, .results-table td { display: block; width: 100%; }
+        .results-table tr { padding: .8rem; margin-bottom: .75rem; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+        .results-table td { border: 0; padding: .4rem 0; }
+        .results-table td::before { content: attr(data-label); display: block; color: #64748b; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
     }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 {% if evaluation_type %}
-<!-- Librerias CDN de MediaPipe Pose para analisis en frontend. -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="{% static 'exercises/js/camera.js' %}"></script>
-<script>
-    document.getElementById('btnStartEval').addEventListener('click', function() {
-        const placeholder = document.getElementById('cameraPlaceholder');
-        if(placeholder) placeholder.style.display = 'none';
-    });
-</script>
 {% endif %}
 {% endblock %}

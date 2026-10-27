@@ -76,6 +76,24 @@
     const ROMBERG_POINTS = [0, 11, 12, 23, 24, 27, 28];
     const ROMBERG_LIVE_MS = 3000;              // balanceo en vivo: últimos 3 s
     const rombergFrames = { 1: [], 2: [] };    // fase 1 = ojos abiertos, fase 2 = ojos cerrados
+    // Estado de la evaluación de Romberg: 'esperando' (aún no se ve el cuerpo entero), 'midiendo',
+    // 'cambio' (5 s para cerrar los ojos entre la fase 1 y la 2). Solo se graban puntos al medir.
+    const ROMBERG_CHANGE_SECONDS = 5;
+    let rombergState = 'esperando';
+    let changeStartedAt = 0;
+    const rombergIntro = document.getElementById('rombergIntro');
+    const rombergRun = document.getElementById('rombergRun');
+    const routineUrl = (document.querySelector('[data-routine-url]') || {}).dataset?.routineUrl || '/rutina-diaria/';
+
+    // Muestra un paso de la página de Romberg: 'intro', 'run' o ninguno ('none').
+    function showRombergView(view) {
+        if (rombergIntro) rombergIntro.classList.toggle('d-none', view !== 'intro');
+        if (rombergRun) rombergRun.classList.toggle('d-none', view !== 'run');
+    }
+
+    function setInstruction(text) {
+        if (phaseNotice) phaseNotice.textContent = text;
+    }
 
     function resetModelStats(keepBuffer) {
         modelStats = {
@@ -90,6 +108,7 @@
     // Se llama al empezar cada repetición o fase: los ejercicios del modelo esperan la postura.
     function armPostureGate() {
         postureReady = !MODEL_TESTS.has(getTestType());
+        rombergState = 'esperando';
     }
 
     function summarizeModelStats() {
@@ -115,6 +134,8 @@
         if (!force && now - lastSpeechAt < SPEECH_MIN_INTERVAL_MS) return;
         lastSpeechAt = now;
         if ('speechSynthesis' in window) {
+            // Una corrección no corta la indicación que se está diciendo (p. ej. con qué pie empezar).
+            if (!force && window.speechSynthesis.speaking) return;
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'es-ES';
@@ -182,20 +203,29 @@
     }
 
     // Muestra el resultado de la evaluación de Romberg (los textos vienen del servidor como datos).
-    function showRombergResult(kind, title, lines) {
+    // action = {label, href} para el botón principal (continuar o repetir).
+    function showRombergResult(kind, title, lines, action) {
         if (!rombergResult) return;
         rombergResult.replaceChildren();
         const box = document.createElement('div');
-        box.className = `alert alert-${kind} rounded-4 mb-0`;
-        const strong = document.createElement('strong');
+        box.className = `romberg-card alert alert-${kind} mb-0`;
+        const strong = document.createElement('h2');
+        strong.className = 'h3 fw-bold mb-3';
         strong.textContent = title;
         box.appendChild(strong);
         lines.forEach((text) => {
-            const div = document.createElement('div');
-            div.className = 'small mt-1';
+            const div = document.createElement('p');
+            div.className = 'mb-2 fs-5';
             div.textContent = text;
             box.appendChild(div);
         });
+        if (action) {
+            const link = document.createElement('a');
+            link.className = 'btn btn-success btn-lg rounded-pill px-5 fw-bold mt-3';
+            link.href = action.href;
+            link.textContent = action.label;
+            box.appendChild(link);
+        }
         rombergResult.appendChild(box);
     }
 
@@ -204,12 +234,12 @@
             return `${name}: no se pudo medir.`;
         }
         const side = phase.lado && phase.lado !== 'centro' ? `, hacia la ${phase.lado}` : '';
-        return `${name}: balanceo de ${phase.amplitud_cm} cm${side} (${phase.pct_utiles} % de fotogramas útiles).`;
+        return `${name}: balanceo de ${phase.amplitud_cm} cm${side}.`;
     }
 
-    // Al terminar las dos fases se envían los puntos; el servidor calcula y guarda la sugerencia.
+    // Al terminar las dos fases se envían los puntos; el servidor mide el balanceo y lo guarda.
     async function enviarRomberg() {
-        showRombergResult('info', 'Calculando el resultado...', []);
+        showRombergResult('info', 'Guardando la evaluación…', []);
         try {
             const response = await fetch('/api/romberg/', {
                 method: 'POST',
@@ -227,20 +257,21 @@
             }
             if (!result.valid) {
                 showRombergResult('warning', 'Hay que repetir la evaluación', [
-                    'La cámara no vio bien a la persona en alguna fase (debe verse de la cabeza a los pies).',
-                    describePhase('Ojos abiertos', result.open),
-                    describePhase('Ojos cerrados', result.closed)
-                ]);
+                    'La cámara no vio bien el cuerpo entero. Aléjese un poco para que se vea de la cabeza a los pies.'
+                ], { label: 'Repetir la evaluación', href: window.location.pathname + window.location.search });
                 return;
             }
-            showRombergResult('success', `Evaluación ${result.type.toLowerCase()} guardada`, [
+            const inicial = evaluationType === 'INICIAL';
+            showRombergResult('success', 'Evaluación terminada', [
                 describePhase('Ojos abiertos', result.open),
                 describePhase('Ojos cerrados', result.closed),
-                'Recargando la página...'
-            ]);
-            window.setTimeout(() => window.location.assign(window.location.pathname), 2500);
+                inicial ? 'Ya puede empezar los ejercicios de equilibrio.' : 'Quedó guardada para comparar con la evaluación inicial.'
+            ], inicial
+                ? { label: 'Continuar con los ejercicios', href: routineUrl }
+                : { label: 'Ver mi progreso', href: '/mi-progreso/' });
         } catch (error) {
-            showRombergResult('danger', 'No se guardó la evaluación', [error.message]);
+            showRombergResult('danger', 'No se guardó la evaluación', [error.message],
+                { label: 'Volver a intentar', href: window.location.pathname + window.location.search });
         }
     }
 
@@ -255,10 +286,11 @@
         }
         const testType = getTestType();
         // Romberg: se envían los últimos 3 s de la fase (7 puntos por fotograma); si no, el último segundo.
-        const phaseFrames = rombergFrames[currentPhase] || [];
+        const phaseFrames = rombergState === 'midiendo' ? (rombergFrames[currentPhase] || []) : [];
         const frames = MODEL_TESTS.has(testType)
             ? frameBuffer.map((item) => item.lm)
-            : phaseFrames.filter((f) => now - f.t <= ROMBERG_LIVE_MS);
+            : (phaseFrames.length ? phaseFrames.filter((f) => now - f.t <= ROMBERG_LIVE_MS)
+                : frameBuffer.map((item) => ({ t: item.t, p: ROMBERG_POINTS.map((i) => [item.lm[i][0], item.lm[i][1], item.lm[i][3]]) })));
 
         pythonAnalysisInFlight = true;
         lastPythonAnalysisAt = now;
@@ -293,8 +325,16 @@
 
             // Romberg en vivo: solo se muestra; el resultado se calcula al final con las dos fases.
             if (!result.valido) {
-                setAnalysisStatus(result.message || 'Colóquese de cuerpo entero frente a la cámara', true);
+                setAnalysisStatus('No se ve el cuerpo entero: aléjese un poco de la cámara', true);
                 return;
+            }
+            if (rombergState === 'esperando') {
+                // Ya se ve el cuerpo entero: empieza a contar la fase 1.
+                rombergState = 'midiendo';
+                evaluationStartedAt = performance.now();
+                rombergFrames[currentPhase] = [];
+                setInstruction('Ojos abiertos. Mire al frente');
+                speak('Muy bien. Mantenga los pies juntos y mire al frente', true);
             }
             if (metricSway) metricSway.textContent = `${result.amplitud_cm} cm`;
             if (metricSide) metricSide.textContent = result.lado || '--';
@@ -381,18 +421,10 @@
     }
 
     function updatePhaseUI() {
-        const phaseName = currentPhase === 1 ? 'Ojos Abiertos' : 'Ojos Cerrados';
+        const phaseName = currentPhase === 1 ? 'Ojos abiertos' : 'Ojos cerrados';
         if (phaseIndicator) {
             phaseIndicator.textContent = `Fase ${currentPhase} de ${TOTAL_PHASES}: ${phaseName}`;
         }
-    }
-
-    function showPhaseNotice(message) {
-        if (!phaseNotice) {
-            return;
-        }
-        phaseNotice.textContent = message;
-        phaseNotice.classList.remove('d-none');
     }
 
     function resetProgressUI() {
@@ -403,11 +435,6 @@
             timerLabel.textContent = DURATION_TEXT;
         }
         updatePhaseUI();
-        if (phaseNotice) {
-            phaseNotice.textContent = '';
-            phaseNotice.classList.add('d-none');
-        }
-        btnStart.innerHTML = '<i class="fas fa-play me-2"></i> Comenzar evaluación';
     }
 
     function drawSkeleton(landmarks) {
@@ -480,7 +507,7 @@
                 return;
             }
             // Romberg: se guardan los 7 puntos de cada fotograma de la fase en curso.
-            if (workActive && rombergFrames[currentPhase]) {
+            if (workActive && rombergState === 'midiendo' && rombergFrames[currentPhase]) {
                 rombergFrames[currentPhase].push({
                     t: frameTime,
                     p: ROMBERG_POINTS.map((i) => {
@@ -521,10 +548,21 @@
             return;
         }
 
-        if (!postureReady) {
-            // Esperando la postura: el reloj se queda en la duración completa.
+        if (!postureReady || (!isRoutine && rombergState === 'esperando')) {
+            // Esperando la postura (rutina) o el cuerpo entero (Romberg): el reloj no corre.
             updateProgressUI(0);
             animationRef = window.requestAnimationFrame(processFrameLoop);
+            return;
+        }
+        if (!isRoutine && rombergState === 'cambio') {
+            // Entre fases: cuenta regresiva para cerrar los ojos, sin grabar puntos.
+            const left = Math.ceil(ROMBERG_CHANGE_SECONDS - (performance.now() - changeStartedAt) / 1000);
+            if (left <= 0) {
+                startClosedEyesPhase();
+            } else {
+                setInstruction(`Cierre los ojos. Empezamos en ${left}`);
+                animationRef = window.requestAnimationFrame(processFrameLoop);
+            }
             return;
         }
         const elapsedSeconds = (performance.now() - evaluationStartedAt) / 1000;
@@ -547,50 +585,39 @@
         animationRef = window.requestAnimationFrame(processFrameLoop);
     }
 
+    // Fin de la fase 1: 5 s para cerrar los ojos y la fase 2 empieza sola.
     function completeOpenEyesPhase() {
-        workActive = false;
-        if (animationRef) {
-            window.cancelAnimationFrame(animationRef);
-            animationRef = null;
-        }
+        rombergState = 'cambio';
+        changeStartedAt = performance.now();
         currentPhase = 2;
         updatePhaseUI();
         updateProgressUI(0);
-        showPhaseNotice('Fase 1 completada. Prepárese para cerrar los ojos.');
-        btnStart.disabled = false;
-        btnStart.innerHTML = '<i class="fas fa-play me-2"></i> Iniciar fase 2';
-        setAnalysisStatus('Listo para iniciar ojos cerrados.', false);
+        setInstruction(`Cierre los ojos. Empezamos en ${ROMBERG_CHANGE_SECONDS}`);
+        setAnalysisStatus('Mantenga los pies juntos', false);
+        speak('Muy bien. Ahora cierre los ojos y mantenga la posición', true);
+        animationRef = window.requestAnimationFrame(processFrameLoop);
     }
 
     // Fin de la fase 2: se apaga la cámara y se envían las dos fases para calcular el resultado.
     async function finishRomberg() {
+        speak('Terminamos. Puede abrir los ojos', true);
         await stopEvaluation(true);
+        showRombergView('none');
         await enviarRomberg();
     }
 
     function startClosedEyesPhase() {
         currentPhase = 2;
-        workActive = true;
+        rombergState = 'midiendo';
         evaluationStartedAt = performance.now();
-        latestAnalysis = null;
         rombergFrames[2] = [];
-        lastPythonAnalysisAt = 0;
-        resetModelStats();
-        armPostureGate();
         updatePhaseUI();
-        if (phaseNotice) {
-            phaseNotice.textContent = 'Fase 2 iniciada. Mantenga los ojos cerrados durante 30 segundos.';
-        }
-        setAnalysisStatus('Buscando cuerpo...', false);
-        btnStart.disabled = true;
-        processFrameLoop();
+        setInstruction('Mantenga los ojos cerrados');
+        animationRef = window.requestAnimationFrame(processFrameLoop);
     }
 
     async function startEvaluation() {
         if (isRunning || startInFlight) {
-            if (!isRoutine && isRunning && currentPhase === 2 && !workActive) {
-                startClosedEyesPhase();
-            }
             return;
         }
 
@@ -600,6 +627,10 @@
         }
 
         startInFlight = true;
+        if (!isRoutine) {
+            showRombergView('run');
+            if (rombergResult) rombergResult.replaceChildren();
+        }
         try {
             streamRef = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -642,14 +673,11 @@
             resetModelStats();
             armPostureGate();
             setCameraBadge(true);
-            setAnalysisStatus('Buscando cuerpo...', false);
+            setAnalysisStatus('Buscando su cuerpo…', false);
             btnStart.disabled = true;
             btnStop.disabled = false;
             updatePhaseUI();
-            if (phaseNotice) {
-                phaseNotice.textContent = 'Fase 1 iniciada. Mantenga los ojos abiertos durante 30 segundos.';
-                phaseNotice.classList.remove('d-none');
-            }
+            if (!isRoutine) setInstruction('Párese con los pies juntos, de cuerpo entero');
 
             processFrameLoop();
         } catch (error) {
@@ -703,7 +731,8 @@
         currentPhase = 1;
         resetProgressUI();
         if (wasRomberg && completed !== true) {
-            showRombergResult('warning', 'Evaluación detenida', ['No se guardó. Puede volver a empezar.']);
+            showRombergView('intro');
+            showRombergResult('warning', 'Evaluación detenida', ['No se guardó. Puede volver a empezar con el botón "Comenzar".']);
         }
     }
 

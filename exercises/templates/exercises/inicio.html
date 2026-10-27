@@ -5,7 +5,7 @@
 
 {% block content %}
 <!-- Panel Superior de Bienvenida (Hero Section) -->
-<div class="hero-panel mb-1" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+<div class="hero-panel mb-3" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
     <h1 class="fw-bold mb-2">Tu equilibrio mejora paso a paso</h1>
     <p class="mb-3" style="font-size: 1.1rem; opacity: 0.9;">
         Cada sesión cuenta. Unos minutos de práctica diaria mejoran estabilidad, confianza al caminar y reducen el riesgo de caídas.
@@ -16,17 +16,72 @@
     </div>
 </div>
 
+<!-- Resumen del paciente (letra grande para facilitar la lectura) -->
+<div class="row g-3 mb-3 patient-summary">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="summary-label">Días completados</span>
+                    <i class="fas fa-calendar-check icon-muted fs-4"></i>
+                </div>
+                <div class="summary-value">{{ resumen.dias }} <span class="summary-unit">de 15</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="summary-label">Repeticiones correctas</span>
+                    <i class="fas fa-check icon-muted fs-4"></i>
+                </div>
+                {% if resumen.pct_correctas is not None %}
+                    <div class="summary-value">{{ resumen.pct_correctas }} %</div>
+                    <div class="summary-note">de {{ resumen.total_reps }} repeticiones</div>
+                {% else %}
+                    <div class="summary-value">–</div>
+                    <div class="summary-note">Aún no hizo ninguna rutina</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="summary-label">Próxima cita</span>
+                    <i class="fas fa-user-doctor icon-muted fs-4"></i>
+                </div>
+                {% if resumen.proxima_cita %}
+                    <div class="summary-value">{{ resumen.proxima_cita.date|date:"d/m" }} <span class="summary-unit">{{ resumen.proxima_cita.date|date:"H:i" }}</span></div>
+                    <div class="summary-note">{{ resumen.proxima_cita.reason }}</div>
+                {% else %}
+                    <div class="summary-value">–</div>
+                    <div class="summary-note">No tiene citas programadas</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% if not resumen.romberg_inicial %}
+<div class="alert alert-info border-0 rounded-4 mb-3 summary-alert">
+    <i class="fas fa-circle-info me-2"></i>Antes de su primera rutina debe hacer la evaluación inicial de equilibrio.
+    <a href="{% url 'evaluacion' %}" class="alert-link">Ir a la evaluación</a>
+</div>
+{% endif %}
+
 <!-- Seccion de Recomendaciones Dinamicas del Doctor -->
 <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: rgba(255, 255, 255, 0.9);">
     <div class="card-body p-4">
-        <h5 class="fw-bold mb-3"><i class="fas fa-bullhorn text-primary me-2"></i> Consejos del doctor</h5>
+        <h2 class="h4 fw-bold mb-3"><i class="fas fa-bullhorn icon-muted me-2"></i> Consejos del doctor</h2>
         {% if advices %}
             <div class="row g-3">
                 {% for advice in advices %}
                     <div class="col-md-6">
                         <div class="p-3 rounded-3 border bg-light h-100">
-                            <div class="fw-semibold">{{ advice.title }}</div>
-                            <p class="text-secondary mb-0">{{ advice.message }}</p>
+                            <div class="fw-bold fs-5">{{ advice.title }}</div>
+                            <p class="mb-0 fs-5 text-body">{{ advice.message }}</p>
                         </div>
                     </div>
                 {% endfor %}
@@ -38,7 +93,7 @@
 </div>
 
 <!-- Seccion de Consejos Fijos con Imagenes (Seguridad, Postura, Constancia) -->
-<div class="row g-0,5 mt-0">
+<div class="row g-3 mt-0">
     <!-- Consejo 1: Seguridad -->
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
@@ -47,8 +102,9 @@
                     <img data-image-autoload src="{% static 'exercises/img/c1.png' %}" alt="Imagen de seguridad para ejercicio">
                     <div class="image-placeholder">Consejo: Seguridad primero</div>
                 </div>
-                <h5 class="fw-bold text-dark"><i class="fas fa-shield-alt text-primary me-2"></i> Consejo 1: Seguridad primero</h5>
-                <p class="mb-0 text-secondary">Use calzado estable, retire obstáculos del entorno y tenga una silla cerca para apoyo.</p>
+                <div class="consejo-label"><i class="fas fa-shield-alt icon-muted me-2"></i>Consejo 1</div>
+                <h3 class="fw-bold text-dark consejo-title">Seguridad primero</h3>
+                <p class="mb-0 fs-5 text-body">Use calzado estable, retire obstáculos del entorno y tenga una silla cerca para apoyo.</p>
             </div>
         </div>
     </div>
@@ -61,8 +117,9 @@
                     <img data-image-autoload src="{% static 'exercises/img/c2.png' %}" alt="Imagen de postura correcta">
                     <div class="image-placeholder">Consejo: Postura consciente</div>
                 </div>
-                <h5 class="fw-bold text-dark"><i class="fas fa-child text-success me-2"></i> Consejo 2: Postura consciente</h5>
-                <p class="mb-0 text-secondary">Mantenga mirada al frente, hombros relajados y respiración constante durante cada ejercicio.</p>
+                <div class="consejo-label"><i class="fas fa-person icon-muted me-2"></i>Consejo 2</div>
+                <h3 class="fw-bold text-dark consejo-title">Postura consciente</h3>
+                <p class="mb-0 fs-5 text-body">Mantenga mirada al frente, hombros relajados y respiración constante durante cada ejercicio.</p>
             </div>
         </div>
     </div>
@@ -75,8 +132,9 @@
                     <img data-image-autoload src="{% static 'exercises/img/c3.png' %}" alt="Imagen de rutina diaria">
                     <div class="image-placeholder">Consejo: Constancia diaria</div>
                 </div>
-                <h5 class="fw-bold text-dark"><i class="fas fa-calendar-check text-warning me-2"></i> Consejo 3: Constancia diaria</h5>
-                <p class="mb-0 text-secondary">Es mejor practicar 10 a 15 minutos al día que una sesión larga de forma esporádica.</p>
+                <div class="consejo-label"><i class="fas fa-calendar-check icon-muted me-2"></i>Consejo 3</div>
+                <h3 class="fw-bold text-dark consejo-title">Constancia diaria</h3>
+                <p class="mb-0 fs-5 text-body">Es mejor practicar 10 a 15 minutos al día que una sesión larga de forma esporádica.</p>
             </div>
         </div>
     </div>

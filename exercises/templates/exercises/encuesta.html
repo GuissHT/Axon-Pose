@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="hero-panel mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-    <h1 class="fw-bold"><i class="fas fa-clipboard-list me-2"></i> Encuesta de Salud</h1>
+    <h1 class="fw-bold">Encuesta de Salud</h1>
     <p class="mb-0 mt-2" style="font-size: 1.1rem; opacity: 0.9;">Por favor responde estas preguntas para ayudarnos a conocer mejor tu situación y personalizar tus recomendaciones.</p>
 </div>
 
@@ -14,7 +14,7 @@
         {% if already_filled %}
             <div class="text-center py-5">
                 <div class="mb-4">
-                    <i class="fas fa-check-circle fa-5x text-success shadow-sm rounded-circle"></i>
+                    <i class="fas fa-check-circle fa-3x text-success"></i>
                 </div>
                 <h2 class="fw-bold text-dark mb-3">¡Encuesta Completada!</h2>
                 <p class="text-muted fs-5 mb-4">Ya has enviado tus respuestas correctamente. Tu doctor ya puede revisar tu estado de salud actual.</p>
@@ -34,10 +34,10 @@
                 <div class="row g-4">
                     {% for q in questions %}
                         <div class="col-md-6">
-                            <div class="p-4 border rounded-4 h-100 question-card transition-all" style="background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.05) !important;">
+                            <div class="p-4 border rounded-4 h-100 question-card transition-all d-flex flex-column" style="background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.05) !important;">
                                 <label class="form-label fw-bold text-dark mb-3" style="font-size: 1.1rem;">{{ forloop.counter }}. {{ q.text }}</label>
                                 
-                                <div class="d-flex gap-4">
+                                <div class="survey-options mt-auto" role="radiogroup">
                                     <div class="form-check custom-radio">
                                         <input class="form-check-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}_si" value="Sí" {% if user_answers|get_item:q.id == "Sí" %}checked{% endif %} required>
                                         <label class="form-check-label fw-bold text-success fs-5" for="q{{ q.id }}_si">Sí</label>
@@ -76,13 +76,33 @@
         box-shadow: 0 10px 20px rgba(0,0,0,0.05);
         background: #ffffff !important;
     }
-    .custom-radio .form-check-input {
-        width: 1.5rem;
-        height: 1.5rem;
+    /* Opciones Sí / No alineadas: mismo ancho, misma altura y círculos redondos (no ovalados). */
+    .survey-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 7rem));
+        gap: 1.5rem;
+        align-items: center;
+    }
+    .survey-options .custom-radio {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 0;
+        padding-left: 0;
+        min-height: 0;
+    }
+    .survey-options .custom-radio .form-check-input,
+    .patient-interface .survey-options .custom-radio .form-check-input {
+        float: none;
+        flex: 0 0 auto;
+        margin: 0;
+        width: 1.75rem;
+        height: 1.75rem;
         cursor: pointer;
     }
-    .custom-radio .form-check-label {
-        padding-top: 0.25rem;
+    .survey-options .custom-radio .form-check-label {
+        padding-top: 0;
+        line-height: 1;
         cursor: pointer;
     }
 </style>

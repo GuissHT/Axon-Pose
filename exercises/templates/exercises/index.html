@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="hero-panel exercise-page__hero mb-4" style="background: linear-gradient(135deg, #1f5d88 0%, #174261 100%); color: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-    <h1 class="fw-bold mb-2"><i class="fas fa-running me-2"></i> Ejercicios de Rehabilitación</h1>
+    <h1 class="fw-bold mb-2">Ejercicios de Rehabilitación</h1>
     <p class="mb-3" style="font-size: 1.1rem; opacity: 0.9;">
         Realiza los ejercicios de rehabilitación indicados para mejorar tu equilibrio y recuperar progresivamente tu movilidad.
     </p>
@@ -18,13 +18,13 @@
     <div class="col-lg-4">
         <div class="card card-test h-100 border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); transition: transform 0.2s;">
             <div class="card-body p-4 d-flex flex-column">
-                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Prueba 01</span>
+                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Ejercicio 1</span>
                 <div class="image-slot mb-3" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px;">
-                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/tandem.jpg' %}" alt="Imagen ejercicio tándem" style="width: 100%; height: 100%; object-fit: cover;">
-                    <div class="image-placeholder">Marcha Tándem</div>
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/tandem.jpg' %}" alt="Esquema de la posición en tándem" style="width: 100%; height: 100%; object-fit: contain; background: #fefefe;">
+                    <div class="image-placeholder">Posición en tándem</div>
                 </div>
-                <h5 class="card-title fw-bold text-dark">Marcha Tándem</h5>
-                <p class="card-text text-secondary mb-4 flex-grow-1">Mejora la coordinación y el control del equilibrio caminando con los pies alineados.</p>
+                <h5 class="card-title fw-bold text-dark">Posición en tándem</h5>
+                <p class="card-text text-secondary mb-4 flex-grow-1">Un pie delante del otro, en línea recta, con los brazos levantados.</p>
                 <a class="btn btn-outline-primary w-100 fw-bold rounded-pill" href="{% url 'ejercicio_tandem' %}">Ver Detalles</a>
             </div>
         </div>
@@ -33,13 +33,13 @@
     <div class="col-lg-4">
         <div class="card card-test h-100 border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); transition: transform 0.2s;">
             <div class="card-body p-4 d-flex flex-column">
-                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Prueba 02</span>
+                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Ejercicio 2</span>
                 <div class="image-slot mb-3" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px;">
-                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/monopodal.png' %}" alt="Imagen ejercicio monopodal" style="width: 100%; height: 100%; object-fit: cover;">
-                    <div class="image-placeholder">Equilibrio Unipodal</div>
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/monopodal.jpg' %}" alt="Esquema del apoyo unipodal" style="width: 100%; height: 100%; object-fit: contain; background: #fefefe;">
+                    <div class="image-placeholder">Apoyo unipodal</div>
                 </div>
-                <h5 class="card-title fw-bold text-dark">Equilibrio Unipodal</h5>
-                <p class="card-text text-secondary mb-4 flex-grow-1">Mide compensaciones y estabilidad manteniendo el apoyo sobre una sola pierna.</p>
+                <h5 class="card-title fw-bold text-dark">Apoyo unipodal</h5>
+                <p class="card-text text-secondary mb-4 flex-grow-1">Sostenerse sobre una sola pierna, con la pelvis nivelada.</p>
                 <a class="btn btn-outline-primary w-100 fw-bold rounded-pill" href="{% url 'ejercicio_monopodal' %}">Ver Detalles</a>
             </div>
         </div>
@@ -48,13 +48,13 @@
     <div class="col-lg-4">
         <div class="card card-test h-100 border-0 shadow-sm rounded-4" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); transition: transform 0.2s;">
             <div class="card-body p-4 d-flex flex-column">
-                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Prueba 03</span>
+                <span class="badge bg-primary mb-3 align-self-start px-3 py-2 rounded-pill">Ejercicio 3</span>
                 <div class="image-slot mb-3" data-image-slot style="border-radius: 12px; overflow: hidden; height: 200px;">
-                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/estatico.png' %}" alt="Imagen ejercicio del árbol" style="width: 100%; height: 100%; object-fit: cover;">
-                    <div class="image-placeholder">Equilibrio del Árbol</div>
+                    <img data-image-autoload src="{% static 'exercises/img/ejercicios/arbol.jpg' %}" alt="Esquema de la postura del árbol" style="width: 100%; height: 100%; object-fit: contain; background: #fefefe;">
+                    <div class="image-placeholder">Postura del árbol</div>
                 </div>
-                <h5 class="card-title fw-bold text-dark">Equilibrio del Árbol</h5>
-                <p class="card-text text-secondary mb-4 flex-grow-1">Fortalece la estabilidad manteniendo el control postural sobre una sola pierna.</p>
+                <h5 class="card-title fw-bold text-dark">Postura del árbol</h5>
+                <p class="card-text text-secondary mb-4 flex-grow-1">Apoyo en una pierna con el otro pie sobre el tobillo o la pantorrilla.</p>
                 <a class="btn btn-outline-primary w-100 fw-bold rounded-pill" href="{% url 'ejercicio_estatico' %}">Ver Detalles</a>
             </div>
         </div>
